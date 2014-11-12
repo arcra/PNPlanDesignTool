@@ -12,7 +12,7 @@ import lxml.etree as ET
 from utils.Vector import Vec2
 import os
 
-VERSION = '0.8'
+__version__ = '0.9'
 
 def _get_treeElement(parent, tag = 'text', attr = None):
     """Aux function to search or create a certain ElementTree element."""
@@ -24,19 +24,40 @@ def _get_treeElement(parent, tag = 'text', attr = None):
         else:
             el = ET.SubElement(parent, tag, attr)
     return el
+
+class PetriNetTypes(object):
+    """'Enum' class for Petri Net types"""
+    
+    NON_PRIMITIVE_TASK = 'non_primitive_task'
+    PRIMITIVE_TASK = 'primitive_task'
+    FINALIZING = 'finalizing'
+    CANCELING = 'canceling'
  
 class PlaceTypes(object):
     """'Enum' class for Place types"""
     
-    ACTION = 'action'
-    PREDICATE = 'predicate'
-    TASK = 'task'
-    REGULAR = 'regular'
+    PRIMITIVE_TASK = 'primitive_task'
+    NON_PRIMITIVE_TASK = 'non_primitive_task'
+    FACT = 'fact'
+    STRUCTURED_FACT = 'structured_fact'
+    COMMAND = 'command'
+    OR = 'or'
+    TASK_STATUS = 'task_status'
 
 class TransitionTypes(object):
     """'Enum' class for Transition types"""
-    IMMEDIATE = 'immediate'
-    TIMED_STOCHASTIC = 'stochastic'
+    
+    PRECONDITIONS = 'preconditions'
+    RULE = 'rule'
+    AND = 'and'
+    SEQUENCE = 'sequence'
+
+class ArcTypes(object):
+    """'Enum' class for Arc types"""
+    
+    SIMPLE = 'simple'
+    BIDIRECTIONAL = 'bidirectional'
+    INHIBITOR = 'inhibitor'
 
 class Node(object):
     """PetriNets Node class, which is extended by Place and Transition Classes.
@@ -58,30 +79,6 @@ class Node(object):
         
         if not name:
             raise Exception('A Node name must be a non-empty string.')
-        
-        if nodeType == PlaceTypes.PREDICATE and name[:2] == 'r.':
-            name = name[2:]
-            self._isRunningCondition = True
-        else:
-            self._isRunningCondition = False
-        
-        if nodeType == PlaceTypes.PREDICATE and name[:2] == 'e.':
-            name = name[2:]
-            self._isEffect = True
-        else:
-            self._isEffect = False
-            
-        if nodeType in [PlaceTypes.ACTION, PlaceTypes.TASK] and name[:2] == 'o.':
-            name = name[2:]
-            self._isOutput = True
-        else:
-            self._isOutput = False
-        
-        if nodeType == PlaceTypes.PREDICATE and name[:4] == 'NOT_':
-            name = name[4:]
-            self._isNegated = True
-        else:
-            self._isNegated = False
         
         self._name = name
         self._type = nodeType
@@ -105,39 +102,11 @@ class Node(object):
         if not value:
             raise Exception('A Node name must be a non-empty string.')
         
-        if self.type == PlaceTypes.PREDICATE and value[:2] == 'r.':
-            value = value[2:]
-            self._isRunningCondition = True
-        else:
-            self._isRunningCondition = False
-        
-        if self.type == PlaceTypes.PREDICATE and value[:2] == 'e.':
-            value = value[2:]
-            self._isEffect = True
-        else:
-            self._isEffect = False
-            
-        if self.type in [PlaceTypes.ACTION, PlaceTypes.TASK] and value[:2] == 'o.':
-            value = value[2:]
-            self._isOutput = True
-        else:
-            self._isOutput = False
-        
-        if self._type == PlaceTypes.PREDICATE and value[:4] == 'NOT_':
-            value = value[4:]
-            self._isNegated = True
-        
         self._name = value
-    
-    @property
-    def _full_name(self):
-        """Read-only property. Name of the node, INCLUDING the type prefix."""
-        return self._type[0] + '.' + ('e.' if self._isEffect else '') + ('r.' if self._isRunningCondition else '') + ('o.' if self._isOutput else '') + ('NOT_' if self._isNegated else '') + self._name
     
     @property
     def type(self):
         """Read-only property. Node type. The actual value is one of the strings from the constants in PlaceTypes and TransitionTypes classes."""
-        
         return self._type
     
     @property
@@ -178,13 +147,13 @@ class Node(object):
         If the id is created by PNLab tool, then it is formed with 
         the first letter of the node type, a dot and the node name.
         """
-        return self._full_name
+        return self.name
 
 class Place(Node):
     """Petri Net Place Class."""
     
     
-    def __init__(self, name, place_type = PlaceTypes.PREDICATE, position = Vec2(), init_marking = 0, capacity = 1):
+    def __init__(self, name, place_type = PlaceTypes.UNORDERED_FACT, position = Vec2(), init_marking = 0, capacity = 1):
         """Place constructor
         
             Sets the name, type, position and initial marking of a place.
@@ -217,29 +186,15 @@ class Place(Node):
         else:
             name = place_id
         
-        place_type = PlaceTypes.PREDICATE
-        if name[:2] == 'a.':
+        place_type = PlaceTypes.UNORDERED_FACT
+        if name[:2] == 's.':
             name = name[2:]
-            place_type = PlaceTypes.ACTION
-        elif name[:7] == 'action.':
-            name = name[7:]
-            place_type = PlaceTypes.ACTION
-        elif name[:2] == 't.':
+            place_type = PlaceTypes.STRUCTURED_FACT
+        elif name[:2] == 'f.':
             name = name[2:]
-            place_type = PlaceTypes.TASK
-        elif name[:5] == 'task.':
-            name = name[5:]
-            place_type = PlaceTypes.TASK
-        elif name[:2] == 'r.':
+            place_type = PlaceTypes.FUNCTION
+        elif name[:2] == 'u.':
             name = name[2:]
-            place_type = PlaceTypes.REGULAR
-        elif name[:8] == 'regular.':
-            name = name[8:]
-            place_type = PlaceTypes.REGULAR
-        elif name[:2] == 'p.':
-            name = name[2:]
-        elif name[:10] == 'predicate.':
-            name = name[10:]
         
         if not name:
             raise Exception('Place name cannot be an empty string.')
@@ -258,7 +213,7 @@ class Place(Node):
         toolspecific_el = element.find('toolspecific[@tool="PNLab"]')
         try:
             p_type = toolspecific_el.find('type').findtext('text')
-            if p_type in [PlaceTypes.ACTION, PlaceTypes.PREDICATE, PlaceTypes.TASK, PlaceTypes.REGULAR]:
+            if p_type in [PlaceTypes.UNORDERED_FACT, PlaceTypes.STRUCTURED_FACT, PlaceTypes.FUNCTION]:
                 place_type = p_type
         except:
             pass
@@ -267,50 +222,10 @@ class Place(Node):
             capacity = int(toolspecific_el.find('capacity/text').text)
         except:
             capacity = 0
-            
-        try:
-            if name[:2] == 'r.':
-                running = True
-                name = name[2:]
-            else:
-                running = int(toolspecific_el.find('isRunningCondition/text').text)
-        except:
-            running = False
-        
-        try:
-            if name[:2] == 'e.':
-                effect = True
-                name = name[2:]
-            else:
-                effect = int(toolspecific_el.find('isEffect/text').text)
-        except:
-            effect = False
-            
-        try:
-            if name[:2] == 'o.':
-                output = True
-                name = name[2:]
-            else:
-                output = int(toolspecific_el.find('isOutput/text').text)
-        except:
-            output = False
-            
-        try:
-            if name[:4] == 'NOT_':
-                negated = True
-                name = name[4:]
-            else:
-                negated = int(toolspecific_el.find('isNegated/text').text)
-        except:
-            negated = False
         
         #NOTE: PNML renaming is done by the PetriNet procedure where this node is created.
         
         p = Place(name, place_type, position, initMarking, capacity)
-        p._isRunningCondition = running
-        p._isEffect = effect
-        p._isNegated = negated
-        p._isOutput = output
         p.hasTreeElement = True
         return p
     
@@ -328,7 +243,7 @@ class Place(Node):
         tmp = ET.SubElement(tmp, 'text')
         tmp.text = str(self.init_marking)
         
-        place_toolspecific = ET.SubElement(place, 'toolspecific', {'tool': 'PNLab', 'version': VERSION})
+        place_toolspecific = ET.SubElement(place, 'toolspecific', {'tool': 'PNLab', 'version': __version__})
     
         tmp = ET.SubElement(place_toolspecific, 'type')
         tmp = ET.SubElement(tmp, 'text')
@@ -337,22 +252,6 @@ class Place(Node):
         tmp = ET.SubElement(place_toolspecific, 'capacity')
         tmp = ET.SubElement(tmp, 'text')
         tmp.text = str(int(self.capacity))
-        
-        tmp = ET.SubElement(place_toolspecific, 'isRunningCondition')
-        tmp = ET.SubElement(tmp, 'text')
-        tmp.text = str(int(self._isRunningCondition))
-        
-        tmp = ET.SubElement(place_toolspecific, 'isEffect')
-        tmp = ET.SubElement(tmp, 'text')
-        tmp.text = str(int(self._isEffect))
-        
-        tmp = ET.SubElement(place_toolspecific, 'isOutput')
-        tmp = ET.SubElement(tmp, 'text')
-        tmp.text = str(int(self._isOutput))
-        
-        tmp = ET.SubElement(place_toolspecific, 'isNegated')
-        tmp = ET.SubElement(tmp, 'text')
-        tmp.text = str(int(self._isNegated))
         
         tmp = ET.SubElement(place, 'graphics')
         ET.SubElement(tmp, 'position', {'x': str(self.position.x), 'y': str(self.position.y)})
@@ -390,7 +289,7 @@ class Place(Node):
         tmp.text = str(self.init_marking)
         
         
-        place_toolspecific = _get_treeElement(place, 'toolspecific[@tool="PNLab"]', {'tool': 'PNLab', 'version': VERSION})
+        place_toolspecific = _get_treeElement(place, 'toolspecific[@tool="PNLab"]', {'tool': 'PNLab', 'version': __version__})
         place_type = _get_treeElement(place_toolspecific, 'type')
         tmp = _get_treeElement(place_type)
         tmp.text = self._type
@@ -398,22 +297,6 @@ class Place(Node):
         place_capacity = _get_treeElement(place_toolspecific, 'capacity')
         tmp = _get_treeElement(place_capacity)
         tmp.text = str(self.capacity)
-        
-        place_isRunningCondition = _get_treeElement(place_toolspecific, 'isRunningCondition')
-        tmp = _get_treeElement(place_isRunningCondition)
-        tmp.text = str(int(self._isRunningCondition))
-        
-        place_isEffect = _get_treeElement(place_toolspecific, 'isEffect')
-        tmp = _get_treeElement(place_isEffect)
-        tmp.text = str(int(self._isEffect))
-        
-        place_isOutput = _get_treeElement(place_toolspecific, 'isOutput')
-        tmp = _get_treeElement(place_isOutput)
-        tmp.text = str(int(self._isOutput))
-        
-        place_isNegated = _get_treeElement(place_toolspecific, 'isNegated')
-        tmp = _get_treeElement(place_isNegated)
-        tmp.text = str(int(self._isNegated))
         
         place_graphics = _get_treeElement(place, 'graphics')
         tmp = _get_treeElement(place_graphics, 'position')
@@ -552,7 +435,7 @@ class Transition(Node):
         else:
             ET.SubElement(tmp, 'offset', {'x': str(0.0), 'y': str(PetriNet.TRANSITION_VERTICAL_LABEL_PADDING)})
         
-        transition_toolspecific = ET.SubElement(transition, 'toolspecific', {'tool': 'PNLab', 'version': VERSION})
+        transition_toolspecific = ET.SubElement(transition, 'toolspecific', {'tool': 'PNLab', 'version': __version__})
         
         tmp = ET.SubElement(transition_toolspecific, 'type')
         tmp = ET.SubElement(tmp, 'text')
@@ -610,7 +493,7 @@ class Transition(Node):
             else:
                 tmp.set('y', str(PetriNet.TRANSITION_VERTICAL_LABEL_PADDING))
         
-        transition_toolspecific = _get_treeElement(transition, 'toolspecific[@tool="PNLab"]', {'tool': 'PNLab', 'version': VERSION})
+        transition_toolspecific = _get_treeElement(transition, 'toolspecific[@tool="PNLab"]', {'tool': 'PNLab', 'version': __version__})
         transition_type = _get_treeElement(transition_toolspecific, 'type')
         tmp = _get_treeElement(transition_type)
         tmp.text = self.type
@@ -720,21 +603,40 @@ class PetriNet(object):
     '''
     
     PLACE_CONFIG = {
-                PlaceTypes.ACTION: {
-                            'fill' : '#00EE00',
-                            'outline' : '#00AA00'
-                            },
-                PlaceTypes.PREDICATE: {
-                            'fill' : '#4444FF',
-                            'outline' : '#0000BB'
-                            },
-                PlaceTypes.TASK: {
+                PlaceTypes.NON_PRIMITIVE_TASK: {
                             'fill' : '#EEEE00',
-                            'outline' : '#AAAA00'
+                            'outline' : '#AAAA00',
+                            'prefix' : 'npt'
                             },
-                PlaceTypes.REGULAR: {
-                            'fill' : '#FFFFFF',
-                            'outline' : '#444444'
+                PlaceTypes.PRIMITIVE_TASK: {
+                            'fill' : '#FF6600',
+                            'outline' : '#DD4400',
+                            'prefix' : 'pt'
+                            },
+                PlaceTypes.COMMAND: {
+                            'fill' : '#99FF66',
+                            'outline' : '#77DD44',
+                            'prefix' : 'cmd'
+                            },
+                PlaceTypes.FACT: {
+                            'fill' : '#4444FF',
+                            'outline' : '#0000BB',
+                            'prefix' : 'fact'
+                            },
+                PlaceTypes.STRUCTURED_FACT: {
+                            'fill' : '#CC0099',
+                            'outline' : '#AA0077',
+                            'prefix' : 'sfact'
+                            },
+                PlaceTypes.OR: {
+                            'fill' : '#88DDFF',
+                            'outline' : '#66BBDD',
+                            'prefix' : 'or'
+                            },
+                PlaceTypes.TASK_STATUS: {
+                            'fill' : '#00EE00',
+                            'outline' : '#00AA00',
+                            'prefix' : 'ts'
                             }
                 }
     
@@ -744,19 +646,31 @@ class PetriNet(object):
     TRANSITION_VERTICAL_LABEL_PADDING = TRANSITION_HALF_LARGE + 15
     
     TRANSITION_CONFIG = {
-                 TransitionTypes.IMMEDIATE: {
+                 TransitionTypes.PRECONDITIONS: {
                                     'fill' : '#444444',
-                                    'outline' : '#444444'
+                                    'outline' : '#444444',
+                                    'prefix' : 'p'
                                     },
-                 TransitionTypes.TIMED_STOCHASTIC: {
+                 TransitionTypes.RULE: {
+                                    'fill' : '#444444',
+                                    'outline' : '#444444',
+                                    'prefix' : 'r'
+                                    },
+                 TransitionTypes.AND: {
+                                    'fill' : '#CC88FF',
+                                    'outline' : '#AA66DD',
+                                    'prefix' : 'and'
+                                    },
+                 TransitionTypes.SEQUENCE: {
                                     'fill' : '#FFFFFF',
-                                    'outline' : '#444444'
+                                    'outline' : '#444444',
+                                    'prefix' : 'seq'
                                     }
                 }
     
     UPDATE_LABEL_OFFSET = True
     
-    def __init__(self, name, _net = None):
+    def __init__(self, name, pn_type, task, _net = None):
         """Petri Net Class' constuctor."""
         
         super(PetriNet, self).__init__()
@@ -765,12 +679,21 @@ class PetriNet(object):
             raise Exception("PetriNet 'name' must be a non-empty string.")
         
         self.name = name
+        self.type = pn_type
+        self.task = task
         self.places = {}
         self.transitions = {}
         self.scale = 1.0
         
         self._place_counter = 0
         self._transition_counter = 0
+        
+        if self.type == PetriNetTypes.NON_PRIMITIVE_TASK:
+            preconditions_transition = Transition(self.name, TransitionTypes.PRECONDITIONS, Vec2(500, 500))
+            self.add_transition(preconditions_transition)
+        else:
+            rule_transition = Transition(self.name, TransitionTypes.RULE, Vec2(500, 500))
+            self.add_transition(rule_transition)
         
         root_el = ET.Element('pnml', {'xmlns': 'http://www.pnml.org/version-2009/grammar/pnml'})
         self._tree = ET.ElementTree(root_el)
@@ -896,7 +819,7 @@ class PetriNet(object):
         
         return t
     
-    def _can_connect(self, source, target):
+    def _can_connect(self, source, target, arc_type = ArcTypes.SIMPLE):
         """
         Checks if an arc can be created between the source and target objects. 
         
@@ -905,23 +828,67 @@ class PetriNet(object):
         """
         if not ((isinstance(source, Place) and isinstance(target, Transition))
                 or (isinstance(source, Transition) and isinstance(target, Place))):
-            return False
+            raise Exception('Arcs should go either from a place to a transition or vice versa and they should exist in the PN.')
         
         if isinstance(source, Place):
             place = source
             transition = target
+            
+            if source.type in [PlaceTypes.COMMAND, PlaceTypes.TASK_STATUS]:
+                raise Exception('COMMAND and TASK_STATUS places cannot connect to any transition.')
+            
+            if source.type in [PlaceTypes.NON_PRIMITIVE_TASK, PlaceTypes.PRIMITIVE_TASK]:
+                if target.type != TransitionTypes.SEQUENCE:
+                    raise Exception('TASK places cannot connect to a transition that is not of type SEQUENCE.')
+                if arc_type != ArcTypes.SIMPLE:
+                    raise Exception('TASK places cannot connect with an arc that is not simple.')
+            
+            if source.type == PlaceTypes.OR:
+                if target.type == TransitionTypes.SEQUENCE:
+                    raise Exception('OR places cannot connect to a SEQUENCE transition.')
+                if arc_type == ArcTypes.BIDIRECTIONAL:
+                    raise Exception('OR places cannot connect with a bidirectional arc.')
         else:
             place = target
             transition = source
             
+            if source.type == TransitionTypes.AND:
+                if target.type != PlaceTypes.OR:
+                    raise Exception('AND transitions cannot connect to a place that is not OR.')
+                if arc_type == ArcTypes.BIDIRECTIONAL:
+                    raise Exception('AND transitions cannot connect with a bidirectional arc.')
+            
+            if source.type == TransitionTypes.PRECONDITIONS:
+                if target.type in [PlaceTypes.COMMAND, PlaceTypes.OR]:
+                    raise Exception('PRECONDITIONS transitions cannot connect to a COMMAND or an OR place.')
+                if target.type in [PlaceTypes.NON_PRIMITIVE_TASK,
+                                   PlaceTypes.PRIMITIVE_TASK,
+                                   PlaceTypes.TASK_STATUS] and \
+                                   arc_type != ArcTypes.SIMPLE:
+                    raise Exception('PRECONDITIONS transitions cannot connect to TASK or TASK_STATUS places with an arc different than simple.')
+            
+            if source.type == TransitionTypes.RULE:
+                if target.type == PlaceTypes.OR:
+                    raise Exception('RULE transitions cannot connect to OR places.')
+                if target.type in [PlaceTypes.COMMAND,
+                                   PlaceTypes.TASK_STATUS,
+                                   PlaceTypes.NON_PRIMITIVE_TASK,
+                                   PlaceTypes.PRIMITIVE_TASK] and \
+                                   arc_type != ArcTypes.SIMPLE:
+                    raise Exception('RULE transitions cannot connect to TASK, TASK_STATUS or COMMAND places with an arc different than simple.')
+            
+            if source.type == TransitionTypes.SEQUENCE:
+                if target.type not in [PlaceTypes.NON_PRIMITIVE_TASK, PlaceTypes.PRIMITIVE_TASK]:
+                    raise Exception('SEQUENCE transitions cannot connect to places that are not TASK places.')
+                if arc_type != ArcTypes.SIMPLE:
+                    raise Exception('SEQUENCE transitions cannot connect with an arc different than simple.')
+            
         if repr(place) not in self.places:
-            return False
+            raise Exception('Arcs should go either from a place to a transition or vice versa and they should exist in the PN.')
         if repr(transition) not in self.transitions:
-            return False
-        
-        return True
+            raise Exception('Arcs should go either from a place to a transition or vice versa and they should exist in the PN.')
     
-    def add_arc(self, source, target, weight = 1, _treeElement = None):
+    def add_arc(self, source, target, arc_type = ArcTypes.SIMPLE, weight = 1, _treeElement = None):
         """
         Adds an arc from 'source' to 'target' with weight 'weight'.
         
@@ -931,8 +898,10 @@ class PetriNet(object):
         _treeElement is an internal field for maintaining a reference to the tree element when read from a pnml file.
         """
         
-        if not self._can_connect(source, target):
-            raise Exception('Arcs should go either from a place to a transition or vice versa and they should exist in the PN.')
+        self._can_connect(source, target)
+        
+        if weight < 1 and isinstance(target, Place):
+            raise Exception('Arcs pointing to places cannot have weights lower than 1.')
         
         if repr(target) in source._outgoing_arcs:
             return
@@ -987,7 +956,12 @@ class PetriNet(object):
                 except:
                     name = net.get('id')
             
-            pn = PetriNet(name, net)
+            try:
+                pn_type = float(net.find('toolspecific[@tool="PNLab"]/type/text').text)
+            except:
+                pn_type = PetriNetTypes.PRIMITIVE_TASK
+            
+            pn = PetriNet(name, pn_type, net)
             
             try:
                 scale = float(net.find('toolspecific[@tool="PNLab"]/scale/text').text)
@@ -1114,9 +1088,12 @@ class PetriNet(object):
         if toolspecific is None:
             toolspecific = ET.SubElement(net, 'toolspecific', {'tool' : 'PNLab'})
         tmp = _get_treeElement(toolspecific, 'scale')
-        tmp = _get_treeElement(tmp, 'scale')
         tmp = _get_treeElement(tmp, 'text')
         tmp.text = str(self.scale)
+        
+        tmp = _get_treeElement(toolspecific, 'type')
+        tmp = _get_treeElement(tmp, 'text')
+        tmp.text = str(self.type)
         
         for p in self.places.itervalues():
             if p.hasTreeElement:

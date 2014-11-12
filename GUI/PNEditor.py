@@ -9,7 +9,8 @@ import tkFont
 import tkMessageBox
 
 from copy import deepcopy
-from PetriNets import Place, PlaceTypes, Vec2, Transition, TransitionTypes, PetriNet
+from PetriNets import Place, PlaceTypes, Vec2, Transition, TransitionTypes, PetriNet,\
+    PetriNetTypes
 from AuxDialogs import PositiveIntDialog, NonNegativeFloatDialog
 
 class PNEditor(Tkinter.Canvas):
@@ -52,25 +53,34 @@ class PNEditor(Tkinter.Canvas):
         self._label_transitions = kwargs.pop('label_transitions', False)
         self._petri_net = kwargs.pop('PetriNet', None)
         petri_net_name = kwargs.pop('name', None)
+        petri_net_type = kwargs.pop('pn_type', None)
+        task = kwargs.pop('task', None)
         
-        if not (petri_net_name or self._petri_net):
-            raise Exception('Either a PetriNet object or a name must be passed to the Petri Net Editor.')
+        if not ((petri_net_name and petri_net_type and task) or self._petri_net):
+            raise Exception('Either a PetriNet object or a name, a type and a task must be passed to the Petri Net Editor.')
         
         if not self._petri_net:
             if not petri_net_name:
                 raise Exception('The PetriNet name cannot be an empty string.')
-            self._petri_net = PetriNet(petri_net_name)
+            self._petri_net = PetriNet(petri_net_name, petri_net_type, task)
+            self._center_diagram(None)
         
         Tkinter.Canvas.__init__(self, parent, *args, **kwargs)
         
         self._canvas_menu = Tkinter.Menu(self, tearoff = 0)
-        self._canvas_menu.add_command(label = 'Add Action Place', command = self._create_action_place)
-        self._canvas_menu.add_command(label = 'Add Predicate Place', command = self._create_predicate_place)
-        self._canvas_menu.add_command(label = 'Add Task Place', command = self._create_task_place)
-        self._canvas_menu.add_command(label = 'Add Regular Place', command = self._create_regular_place)
-        self._canvas_menu.add_separator()
-        self._canvas_menu.add_command(label = 'Add Immediate Transition', command = self._create_immediate_transition)
-        self._canvas_menu.add_command(label = 'Add Stochastic Transition', command = self._create_stochastic_transition)
+        
+        if petri_net_type != PetriNetTypes.NON_PRIMITIVE_TASK:
+            self._canvas_menu.add_command(label = 'Add Fact Place', command = self._create_unordered_fact_place)
+            self._canvas_menu.add_command(label = 'Add Structured Fact Place', command = self._create_structured_fact_place)
+            self._canvas_menu.add_command(label = 'Add Command Place', command = self._create_command_place)
+            self._canvas_menu.add_command(label = 'Add Primitive Task Place', command = self._create_primitve_task_place)
+            self._canvas_menu.add_command(label = 'Add Non-Primitive Task Place', command = self._create_non_primitve_task_place)
+        
+        if petri_net_type == PetriNetTypes.PRIMITIVE_TASK:
+            self._canvas_menu.add_separator()
+            self._canvas_menu.add_command(label = 'Add Failure Place', command = self._create_failure_place)
+            self._canvas_menu.add_command(label = 'Add Success Place', command = self._create_success_place)
+        
         self._canvas_menu.add_separator()
         self._canvas_menu.add_command(label = 'Toggle grid', command = self._toggle_grid)
         self._canvas_menu.add_command(label = "Toggle transition's tags", command = self._toggle_transitions_tags)
@@ -1036,9 +1046,8 @@ class PNEditor(Tkinter.Canvas):
             name = self._get_transition_name(item)
             target = self._petri_net.transitions[name]
             place_vec = target.position - self._source.position
-            trans_vec = -place_vec
             place_point = self._source.position + place_vec.unit*PetriNet.PLACE_RADIUS*self._current_scale
-            transition_point = self._find_intersection(target, trans_vec)
+            transition_point = self._find_intersection(target, self._source)
             self.create_line(place_point.x,
                          place_point.y,
                          transition_point.x,
@@ -1082,13 +1091,11 @@ class PNEditor(Tkinter.Canvas):
             name = self._get_place_name(item)
             target = self._petri_net.places[name]
             place_vec = self._source.position - target.position
-            trans_vec = -place_vec
             target_point = target.position + place_vec.unit*PetriNet.PLACE_RADIUS*self._current_scale
         else:
             target_point = Vec2(event.x, event.y)
-            trans_vec = target_point - self._source.position
         
-        transition_point = self._find_intersection(self._source, trans_vec)
+        transition_point = self._find_intersection(self._source, target)
         self.create_line(transition_point.x,
                      transition_point.y,
                      target_point.x,
@@ -1297,28 +1304,22 @@ class PNEditor(Tkinter.Canvas):
                          fill = 'black',
                          font = self.text_font )
     
-    def _create_action_place(self):
-        """Menu callback to create an ACTION place."""
+    def _create_unordered_fact_place(self):
+        """Menu callback to create an UNORDERED_FACT place."""
         self._hide_menu()
-        placeType = PlaceTypes.ACTION
+        placeType = PlaceTypes.UNORDERED_FACT
         self._create_place(placeType)
     
-    def _create_predicate_place(self):
-        """Menu callback to create an PREDICATE place."""
+    def _create_structured_fact_place(self):
+        """Menu callback to create a STRUCTURED_FACT place."""
         self._hide_menu()
-        placeType = PlaceTypes.PREDICATE
+        placeType = PlaceTypes.STRUCTURED_FACT
         self._create_place(placeType)
     
-    def _create_task_place(self):
-        """Menu callback to create an TASK place."""
+    def _create_function_place(self):
+        """Menu callback to create a FUNCTION place."""
         self._hide_menu()
-        placeType = PlaceTypes.TASK
-        self._create_place(placeType)
-    
-    def _create_regular_place(self):
-        """Menu callback to create an REGULAR place."""
-        self._hide_menu()
-        placeType = PlaceTypes.REGULAR
+        placeType = PlaceTypes.FUNCTION
         self._create_place(placeType)
         
     def _create_place(self, placeType):
@@ -1386,7 +1387,7 @@ class PNEditor(Tkinter.Canvas):
         t = Transition('T{:0>3d}'.format(self._petri_net._transition_counter + 1), transitionType, self._last_point)
         self._set_create_transition_entry(item, t)
     
-    def _draw_place_item(self, point = None, placeType = PlaceTypes.PREDICATE, place = None):
+    def _draw_place_item(self, point = None, placeType = PlaceTypes.UNORDERED_FACT, place = None):
         """Draws a place item, with the attributes corresponding to the place type.
         
             Returns the id generated by the canvas widget.
@@ -1506,12 +1507,7 @@ class PNEditor(Tkinter.Canvas):
         """Callback factory function for the <KeyPress-Return> event of the 'create place' entry widget."""
         def txtboxCallback(event):
             txt = txtbox.get()
-            if not (txt[:2] == p.type[0] + '.' and (
-                                                    PNEditor._NAME_REGEX.match(txt[2:]) or 
-                                                    (p.type == PlaceTypes.PREDICATE
-                                                     and txt[2] in ['r', 'e'] and txt[3] == '.'
-                                                     and PNEditor._NAME_REGEX.match(txt[4:])
-                                                    ))):
+            if not (txt[:2] == p.type[0] + '.' and PNEditor._NAME_REGEX.match(txt[2:])):
                 msg = ('A place name must begin with the first letter of its type and a dot, ' +
                     'followed by a non-empty string, preferably composed of only ' +
                     'alphanumeric characters, dashes or underscores, and possibly spaces. \
@@ -1643,12 +1639,7 @@ class PNEditor(Tkinter.Canvas):
         def txtboxCallback(event):
             old_name = p.name
             txt = txtbox.get()
-            if not (txt[:2] == p.type[0] + '.' and (
-                                                    PNEditor._NAME_REGEX.match(txt[2:]) or 
-                                                    (p.type == PlaceTypes.PREDICATE
-                                                     and txt[2] in ['r', 'e'] and txt[3] == '.'
-                                                     and PNEditor._NAME_REGEX.match(txt[4:])
-                                                    ))):
+            if not (txt[:2] == p.type[0] + '.' and PNEditor._NAME_REGEX.match(txt[2:])):
                 msg = ('A place name must begin with the first letter of its type and a dot, ' +
                     'followed by a non-empty string, preferably composed of only ' +
                     'alphanumeric characters, dashes or underscores, and possibly spaces. \
@@ -1758,9 +1749,10 @@ class PNEditor(Tkinter.Canvas):
         self.delete('source_' + repr(arc.source) + '&&target_' + repr(arc.target))
         
         place_vec = t.position - p.position
-        trans_vec = -place_vec
+        #trans_vec = -place_vec
+        #transition_point = self._find_intersection(t, trans_vec)
         place_point = p.position + place_vec.unit*PetriNet.PLACE_RADIUS*self._current_scale
-        transition_point = self._find_intersection(t, trans_vec)
+        transition_point = self._find_intersection(t, p)
         
         if isinstance(arc.source, Place):
             src_point = place_point
@@ -1771,7 +1763,8 @@ class PNEditor(Tkinter.Canvas):
         
         tags = ('arc', 'source_' + repr(arc.source), 'target_' + repr(arc.target))
         
-        self.create_line(src_point.x,
+        if arc.weight > 0:
+            self.create_line(src_point.x,
                          src_point.y,
                          trgt_point.x,
                          trgt_point.y,
@@ -1779,6 +1772,38 @@ class PNEditor(Tkinter.Canvas):
                          width = PetriNet.LINE_WIDTH,
                          arrow= Tkinter.LAST,
                          arrowshape = (10,12,5) )
+        else:
+            
+            radius = 6
+            origin = trgt_point
+            
+            side = self._get_intersection_side(t, p)
+            if side == 'top':
+                origin.y -= radius
+            elif side == 'bottom':
+                origin.y += radius
+            elif side == 'left':
+                origin.x -= radius
+            else:
+                origin.x += radius
+            
+            trgt_point = origin + radius*(src_point - origin).unit
+            
+            
+            self.create_line(src_point.x,
+                         src_point.y,
+                         trgt_point.x,
+                         trgt_point.y,
+                         tags = tags,
+                         width = PetriNet.LINE_WIDTH )
+            
+            self.create_oval(origin.x - radius,
+                             origin.y - radius,
+                             origin.x + radius,
+                             origin.y + radius,
+                             tags = tags,
+                             width = PetriNet.LINE_WIDTH)
+            
         
         if arc.weight > 1:
             arc_vec = arc.target.position - arc.source.position
@@ -1790,8 +1815,57 @@ class PNEditor(Tkinter.Canvas):
                              text = str(arc.weight),
                              font = self.text_font
                              )
+    
+    def _find_intersection(self, t, p):
+        """This is used to compute the point where an arc hits an edge
+            of a transition's graphic representation (rectangle)."""
         
+        if t.isHorizontal:
+            half_width = PetriNet.TRANSITION_HALF_LARGE
+            half_height = PetriNet.TRANSITION_HALF_SMALL
+        else:
+            half_width = PetriNet.TRANSITION_HALF_SMALL
+            half_height = PetriNet.TRANSITION_HALF_LARGE
         
+        half_width *= self._current_scale
+        half_height *= self._current_scale
+        
+        vec = p.position - t.position
+        
+        if vec.x < 0:
+            half_width *= -1
+        if vec.y < 0:
+            half_height *= -1
+        
+        pos = t.position + Vec2(half_width*min(abs(vec.x)/300,1), half_height*min(abs(vec.y)/300,1))
+        
+        vec = p.position - pos
+        
+        #vec2 = "closest corner from vector from t to p" - pos
+        vec2 = t.position + Vec2(half_width, half_height) - pos
+        
+        #vector is vertical => m is infinity
+        if vec.x == 0:
+            return Vec2(pos.x, t.position.y + half_height)
+        
+        # i. e. pos is on the edge (place is further away than 300 from transition... because of how pos is calculated)
+        if vec2.x == 0:
+            return pos
+        
+        #Test vertical side:
+        m1 = vec.y/vec.x
+        m2 = vec2.y/vec2.x
+        if abs(m1) <= abs(m2):
+            x = vec2.x
+            y = m1*x #x0 = y0 = b0 = 0
+            return pos + Vec2(x, y)
+        
+        #Test horizontal side:
+        y = vec2.y
+        x = y/m1 #x0 = y0 = b0 = 0 
+        return pos + Vec2(x, y)
+    
+    '''
     def _find_intersection(self, t, vec):
         """This is used to compute the point where an arc hits an edge
             of a transition's graphic representation (rectangle)."""
@@ -1827,6 +1901,64 @@ class PNEditor(Tkinter.Canvas):
         y = half_height
         x = y/m #x0 = y0 = b0 = 0 
         return t.position + Vec2(x, y)
+    '''
+    
+    def _get_intersection_side(self, t, p):
+        """This is used to compute the side where an arc hits an edge
+            of a transition's graphic representation (rectangle)."""
+        
+        if t.isHorizontal:
+            half_width = PetriNet.TRANSITION_HALF_LARGE
+            half_height = PetriNet.TRANSITION_HALF_SMALL
+        else:
+            half_width = PetriNet.TRANSITION_HALF_SMALL
+            half_height = PetriNet.TRANSITION_HALF_LARGE
+        
+        half_width *= self._current_scale
+        half_height *= self._current_scale
+        
+        vec = p.position - t.position
+        
+        if vec.x < 0:
+            half_width *= -1
+        if vec.y < 0:
+            half_height *= -1
+        
+        pos = t.position + Vec2(half_width*min(abs(vec.x)/300,1), half_height*min(abs(vec.y)/300,1))
+        
+        vec = p.position - pos
+        
+        #vec2 = "closest corner" - pos
+        vec2 = t.position + Vec2(half_width, half_height) - pos
+        
+        #vector is vertical => m is infinity
+        if vec.x == 0:
+            if vec.y > 0:
+                return 'bottom'
+            else:
+                return 'top'
+        
+        #pos is on the edge of the transition
+        if vec2.x == 0:
+            if vec.x > 0:
+                return 'right'
+            else:
+                return 'left'
+        
+        #Test vertical side:
+        m1 = vec.y/vec.x
+        m2 = vec2.y/vec2.x
+        if abs(m1) <= abs(m2):
+            if vec.x > 0:
+                return 'right'
+            else:
+                return 'left'
+        
+        #Test horizontal side:
+        if vec.y > 0:
+            return 'bottom'
+        else:
+            return 'top'
     
     def _popup_menu(self, event):
         """Determines whether the event ocurred over an existing item and which one to
@@ -1952,10 +2084,9 @@ class PNEditor(Tkinter.Canvas):
             self._state = 'normal'
             self.grab_release()
             self.itemconfig('transition', state = Tkinter.NORMAL)
-            self.itemconfig('place&&' + PlaceTypes.ACTION + '&&!label&&!token', outline = PetriNet.PLACE_CONFIG[PlaceTypes.ACTION]['outline'], width = PetriNet.LINE_WIDTH)
-            self.itemconfig('place&&' + PlaceTypes.PREDICATE + '&&!label&&!token', outline = PetriNet.PLACE_CONFIG[PlaceTypes.PREDICATE]['outline'], width = PetriNet.LINE_WIDTH)
-            self.itemconfig('place&&' + PlaceTypes.TASK + '&&!label&&!token', outline = PetriNet.PLACE_CONFIG[PlaceTypes.TASK]['outline'], width = PetriNet.LINE_WIDTH)
-            self.itemconfig('place&&' + PlaceTypes.REGULAR + '&&!label&&!token', outline = PetriNet.PLACE_CONFIG[PlaceTypes.REGULAR]['outline'], width = PetriNet.LINE_WIDTH)
+            self.itemconfig('place&&' + PlaceTypes.UNORDERED_FACT + '&&!label&&!token', outline = PetriNet.PLACE_CONFIG[PlaceTypes.UNORDERED_FACT]['outline'], width = PetriNet.LINE_WIDTH)
+            self.itemconfig('place&&' + PlaceTypes.STRUCTURED_FACT + '&&!label&&!token', outline = PetriNet.PLACE_CONFIG[PlaceTypes.STRUCTURED_FACT]['outline'], width = PetriNet.LINE_WIDTH)
+            self.itemconfig('place&&' + PlaceTypes.FUNCTION + '&&!label&&!token', outline = PetriNet.PLACE_CONFIG[PlaceTypes.FUNCTION]['outline'], width = PetriNet.LINE_WIDTH)
             self.unbind('<Motion>', self._connecting_transition_fn_id)
             self.delete('connecting')
             item = self._get_current_item(event)

@@ -16,7 +16,7 @@ _POSITIVE_FLOAT_REGEX = re.compile('^[0-9]+(\.[0-9]+)?$')
 
 class InputDialog(object):
     
-    def __init__(self, title, text, label, regex = re.compile('^[a-zA-Z0-9_-][a-zA-Z0-9_ -]*$'), value = '', error_message = 'Please input a non-empty string, preferably composed of only alphanumeric characters, dashes, underscores, and possibly spaces.', entry_length = 10):
+    def __init__(self, title, text, label, regex = re.compile('^[a-zA-Z0-9_-]+$'), value = '', error_message = 'Please input a non-empty string, composed of only alphanumeric characters, dashes and underscores.', entry_length = 10):
         super(InputDialog, self).__init__()
         
         self.value_set = False
