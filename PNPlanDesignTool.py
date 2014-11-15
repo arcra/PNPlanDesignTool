@@ -16,7 +16,7 @@ import tkFont
 import zipfile
 import tempfile
 
-from PetriNets import PetriNet, PetriNetTypes
+from petrinets import BasicPetriNet
 from GUI.TabManager import TabManager
 from GUI.PNEditor import PNEditor
 from GUI.AuxDialogs import InputDialog
@@ -223,16 +223,15 @@ class PNPDT(object):
         open_tab = kwargs.pop('open_tab', True)
         pn = kwargs.pop('pn_object', None)
         pn_name = kwargs.pop('pn_name', None)
-        pn_type = kwargs.pop('pn_type', None)
         task = kwargs.pop('task', None)
         
-        if not ((pn_name and pn_type and task) or pn):
-            raise Exception('Either a PetriNet object or a name and a type must be passed to the Petri Net Editor.') 
+        if not ((pn_name and task) or pn):
+            raise Exception('Either a PetriNet object or a name and a task name must be passed to the Petri Net Editor.') 
         
         if pn:
             pne = PNEditor(self.tab_manager, PetriNet = pn)
         else:
-            pne = PNEditor(self.tab_manager, name = pn_name, pn_type = pn_type, task = task)
+            pne = PNEditor(self.tab_manager, name = pn_name, task = task)
         self.petri_nets[item_id] = pne
         if open_tab:
             self.tab_manager.add(pne, text = pne.name)
@@ -301,6 +300,7 @@ class PNPDT(object):
         item_tags.remove('subfolder')
         item_tags.remove('folder')
         
+        '''
         if self.project_tree.tag_has('dexec', self.clicked_element):
             if self.project_tree.tag_has('primitive_action', self.clicked_element):
                 pn_type = PetriNetTypes.PRIMITIVE_TASK
@@ -310,6 +310,7 @@ class PNPDT(object):
             pn_type = PetriNetTypes.FINALIZING
         elif self.project_tree.tag_has('canceling', self.clicked_element):
             pn_type = PetriNetTypes.CANCELING
+        '''
         
         try:
             self.project_tree.insert(self.clicked_element, 'end', item_id, text = name, tags = item_tags)
@@ -327,7 +328,7 @@ class PNPDT(object):
         if not task:
             raise Exception('Task tag was not found!')
         
-        self._add_pne(item_id, pn_name = name, pn_type = pn_type, task = task)
+        self._add_pne(item_id, pn_name = name, task = task)
     
     def open_callback(self, event):
         self.clicked_element = self.project_tree.identify('item', event.x, event.y)
@@ -399,8 +400,7 @@ class PNPDT(object):
         
     def _import_from_pnml(self, filename, parent):
         try:
-            
-            petri_nets = PetriNet.from_pnml_file(filename)
+            petri_nets = BasicPetriNet.from_pnml_file(filename)
         except Exception as e:
             tkMessageBox.showerror('Error reading PNML file.', 'An error occurred while reading the PNML file.\n\n' + str(e))
             return

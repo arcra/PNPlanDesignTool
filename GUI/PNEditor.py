@@ -9,8 +9,10 @@ import tkFont
 import tkMessageBox
 
 from copy import deepcopy
-from PetriNets import Place, PlaceTypes, Vec2, Transition, TransitionTypes, PetriNet,\
-    PetriNetTypes
+from petrinets import BasicPetriNet
+from nodes import Place, Transition, TRANSITION_CLASSES, PLACE_CLASSES
+from settings import *
+from utils.Vector import Vec2
 from AuxDialogs import PositiveIntDialog, NonNegativeFloatDialog
 
 class PNEditor(Tkinter.Canvas):
@@ -43,32 +45,33 @@ class PNEditor(Tkinter.Canvas):
         PetriNet -- Petri Net object to load for viewing/editing.
         name -- In case no Petri Net object is specified, a name must be
                 specified for the new Petri Net to be created.
+        task -- In case no Petri Net object is specified, a task name must be
+                specified for the new Petri Net to be created.
         grid -- (Default True) Boolean that specifies whether to draw a square grid.
         """
         
         if not 'bg' in kwargs:
             kwargs['bg'] = 'white'
-            
+        
         self._grid = kwargs.pop('grid', True)
         self._label_transitions = kwargs.pop('label_transitions', False)
         self._petri_net = kwargs.pop('PetriNet', None)
         petri_net_name = kwargs.pop('name', None)
-        petri_net_type = kwargs.pop('pn_type', None)
         task = kwargs.pop('task', None)
         
-        if not ((petri_net_name and petri_net_type and task) or self._petri_net):
-            raise Exception('Either a PetriNet object or a name, a type and a task must be passed to the Petri Net Editor.')
+        if not ((petri_net_name and task) or self._petri_net):
+            raise Exception('Either a PetriNet object or a name and a task name must be passed to the Petri Net Editor.')
+        
+        Tkinter.Canvas.__init__(self, parent, *args, **kwargs)
         
         if not self._petri_net:
             if not petri_net_name:
                 raise Exception('The PetriNet name cannot be an empty string.')
-            self._petri_net = PetriNet(petri_net_name, petri_net_type, task)
-            self._center_diagram(None)
-        
-        Tkinter.Canvas.__init__(self, parent, *args, **kwargs)
+            self._petri_net = BasicPetriNet(petri_net_name, task)
         
         self._canvas_menu = Tkinter.Menu(self, tearoff = 0)
         
+        '''
         if petri_net_type != PetriNetTypes.NON_PRIMITIVE_TASK:
             self._canvas_menu.add_command(label = 'Add Fact Place', command = self._create_unordered_fact_place)
             self._canvas_menu.add_command(label = 'Add Structured Fact Place', command = self._create_structured_fact_place)
@@ -80,7 +83,10 @@ class PNEditor(Tkinter.Canvas):
             self._canvas_menu.add_separator()
             self._canvas_menu.add_command(label = 'Add Failure Place', command = self._create_failure_place)
             self._canvas_menu.add_command(label = 'Add Success Place', command = self._create_success_place)
+        '''
         
+        self._canvas_menu.add_command(label = 'Add Place', command = self._create_regular_place)
+        self._canvas_menu.add_command(label = 'Add Transition', command = self._create_regular_transition)
         self._canvas_menu.add_separator()
         self._canvas_menu.add_command(label = 'Toggle grid', command = self._toggle_grid)
         self._canvas_menu.add_command(label = "Toggle transition's tags", command = self._toggle_transitions_tags)
@@ -109,11 +115,14 @@ class PNEditor(Tkinter.Canvas):
         self._arc_menu.add_separator()
         self._arc_menu.add_command(label = 'Remove arc', command = self._remove_arc)
         
+        ################
+        # INIT VARS
+        ################
         self._last_point = Vec2()
         
         self._offset = Vec2()
         
-        self.text_font = tkFont.Font(self, family = "Helvetica", size = 12)
+        self.text_font = tkFont.Font(family = "Helvetica", size = 12)
         self._anchor_tag = 'all'
         self._anchor_set = False
         
@@ -253,78 +262,55 @@ class PNEditor(Tkinter.Canvas):
                 trgt = self._petri_net.places[repr(action[2].target)]
             self.add_arc(src, trgt, action[2].weight, _treeElement = action[2]._treeElement)
         elif action[0] == 'rename_place':
-            self.delete('label&&place_' + repr(action[2]))
+            old_tag = 'place_' + repr(action[2])
+            self.delete('label&&' + old_tag)
             p = self._petri_net.places[repr(action[2])]
             old_name = p.name
-            old_tag = 'place_' + repr(action[2])
-            item_id = self.find_withtag(old_tag)[0]
             tags = ('label',) + self.gettags(old_tag)
             self.delete('source_' + repr(p))
             self.delete('target_' + repr(p))
-            successful = True
+            
             try:
-                if not self._petri_net.rename_place(p, action[3]):
-                    successful = False
-                    tkMessageBox.showerror('Duplicate name', 'A place of the same type with that name already exists in the Petri Net.')
+                p.name = action[3]
+                action[2] = p
+                action[3] = old_name
             except Exception as e:
-                successful = False
-                tkMessageBox.showerror('ERROR', str(e))
+                tkMessageBox.showerror('Invalid Name', e)
             
             self._draw_item_arcs(p)
-            label_id = self.create_text(p.position.x,
-                             p.position.y + PetriNet.PLACE_LABEL_PADDING*self._current_scale,
+            self.create_text(p.position.x,
+                             p.position.y + PLACE_LABEL_PADDING*self._current_scale,
                              text = str(p),
                              tags=tags,
                              font = self.text_font )
-            
-            if not successful:
-                return
-            self.addtag_withtag('place_' + repr(p), old_tag)
-            self.dtag(item_id, old_tag)
-            self.dtag(label_id, old_tag)
-            
-            action[2] = p
-            action[3] = old_name
         elif action[0] == 'rename_transition':
-            self.delete('label&&transition_' + repr(action[2]))
+            old_tag = 'transition_' + repr(action[2])
+            self.delete('label&&' + old_tag)
             t = self._petri_net.transitions[repr(action[2])]
             old_name = t.name
-            old_tag = 'transition_' + repr(action[2])
-            item_id = self.find_withtag(old_tag)[0]
             tags = ('label',) + self.gettags(old_tag)
             self.delete('source_' + repr(t))
             self.delete('target_' + repr(t))
-            successful = True
+            
             try:
-                if not self._petri_net.rename_transition(t, action[3]):
-                    successful = False
-                    tkMessageBox.showerror('Duplicate name', 'A transition of the same type with that name already exists in the Petri Net.')
+                t.name = action[3]
+                action[2] = t
+                action[3] = old_name
             except Exception as e:
-                successful = False
-                tkMessageBox.showerror('ERROR', str(e))
+                tkMessageBox.showerror('Invalid Name', e)
             
             if t.isHorizontal:
-                label_padding = PetriNet.TRANSITION_HORIZONTAL_LABEL_PADDING + 10
+                label_padding = TRANSITION_HORIZONTAL_LABEL_PADDING + 10
             else:
-                label_padding = PetriNet.TRANSITION_VERTICAL_LABEL_PADDING + 10
+                label_padding = TRANSITION_VERTICAL_LABEL_PADDING + 10
             
             self._draw_item_arcs(t)
             if self._label_transitions:
-                label_id = self.create_text(t.position.x,
+                self.create_text(t.position.x,
                                  t.position.y + label_padding*self._current_scale,
                                  text = str(t),
                                  tags=tags,
                                  font = self.text_font )
-            
-            if not successful:
-                return
-            self.addtag_withtag('transition_' + repr(t), old_tag)
-            self.dtag(item_id, old_tag)
-            if self._label_transitions:
-                self.dtag(label_id, old_tag)
-            
-            action[2] = t
-            action[3] = old_name
         elif action[0] == 'move_node':
             move_vec = -action[3]/action[-1]*self._current_scale
             if isinstance(action[2], Place):
@@ -415,87 +401,56 @@ class PNEditor(Tkinter.Canvas):
                 trgt = self._petri_net.places[repr(action[2].target)]
             self.remove_arc(src, trgt)
         elif action[0] == 'rename_place':
-            self.delete('label&&place_' + repr(action[2]))
-            p = self._petri_net.places[repr(action[2])]
+            
             old_tag = 'place_' + repr(action[2])
-            item_id = self.find_withtag(old_tag)[0]
+            self.delete('label&&' + old_tag)
+            p = self._petri_net.places[repr(action[2])]
             old_name = p.name
             tags = ('label',) + self.gettags(old_tag)
             self.delete('source_' + repr(p))
             self.delete('target_' + repr(p))
+            
             try:
-                if not self._petri_net.rename_place(p, action[3]):
-                    self._draw_item_arcs(p)
-                    self.create_text(p.position.x,
-                             p.position.y + PetriNet.PLACE_LABEL_PADDING*self._current_scale,
-                             text = str(p),
-                             tags=tags,
-                             font = self.text_font )
-                    tkMessageBox.showerror('Duplicate name', 'A place of the same type with that name already exists in the Petri Net.')
-                    return
+                p.name = action[3]
+                action[2] = p
+                action[3] = old_name
             except Exception as e:
-                self._draw_item_arcs(p)
-                self.create_text(p.position.x,
-                             p.position.y + PetriNet.PLACE_LABEL_PADDING*self._current_scale,
-                             text = str(p),
-                             tags=tags,
-                             font = self.text_font )
-                tkMessageBox.showerror('ERROR', str(e))
-                return
+                tkMessageBox.showerror('Invalid Name', e)
             
             self._draw_item_arcs(p)
-            label_id = self.create_text(p.position.x,
-                             p.position.y + PetriNet.PLACE_LABEL_PADDING*self._current_scale,
+            self.create_text(p.position.x,
+                             p.position.y + PLACE_LABEL_PADDING*self._current_scale,
                              text = str(p),
                              tags=tags,
                              font = self.text_font )
-            
-            self.addtag_withtag('place_' + repr(p), old_tag)
-            self.dtag(item_id, old_tag)
-            self.dtag(label_id, old_tag)
-            
-            action[2] = p
-            action[3] = old_name
         elif action[0] == 'rename_transition':
-            self.delete('label&&transition_' + repr(action[2]))
+            old_tag = 'transition_' + repr(action[2])
+            self.delete('label&&' + old_tag)
             t = self._petri_net.transitions[repr(action[2])]
             old_name = t.name
-            old_tag = 'transition_' + repr(action[2])
-            item_id = self.find_withtag(old_tag)[0]
             tags = ('label',) + self.gettags(old_tag)
             self.delete('source_' + repr(t))
             self.delete('target_' + repr(t))
-            successful = True
+            
             try:
-                if not self._petri_net.rename_transition(t, action[3]):
-                    successful = False
-                    tkMessageBox.showerror('Duplicate name', 'A transition of the same type with that name already exists in the Petri Net.')
+                t.name = action[3]
+                action[2] = t
+                action[3] = old_name
             except Exception as e:
-                successful = False
-                tkMessageBox.showerror('ERROR', str(e))
+                tkMessageBox.showerror('Invalid Name', e)
             
             if t.isHorizontal:
-                label_padding = PetriNet.TRANSITION_HORIZONTAL_LABEL_PADDING + 10
+                label_padding = TRANSITION_HORIZONTAL_LABEL_PADDING + 10
             else:
-                label_padding = PetriNet.TRANSITION_VERTICAL_LABEL_PADDING + 10
+                label_padding = TRANSITION_VERTICAL_LABEL_PADDING + 10
             
             self._draw_item_arcs(t)
             if self._label_transitions:
-                label_id = self.create_text(t.position.x,
+                self.create_text(t.position.x,
                                  t.position.y + label_padding*self._current_scale,
                                  text = str(t),
                                  tags=tags,
                                  font = self.text_font )
-            
-            if not successful:
-                return
-            self.addtag_withtag('transition_' + repr(t), old_tag)
-            self.dtag(item_id, old_tag)
-            if self._label_transitions:
-                self.dtag(label_id, old_tag)
-            
-            action[2] = t
-            action[3] = old_name
         elif action[0] == 'move_node':
             move_vec = action[3]/action[-1]*self._current_scale
             if isinstance(action[2], Place):
@@ -698,7 +653,7 @@ class PNEditor(Tkinter.Canvas):
         miny = 1000000000
         maxy = -1000000000
         
-        padding = PetriNet.TRANSITION_HALF_LARGE * 2 * self._current_scale
+        padding = TRANSITION_HALF_LARGE * 2 * self._current_scale
         
         for p in self._petri_net.places.itervalues():
             if p.position.x - padding < minx:
@@ -827,7 +782,7 @@ class PNEditor(Tkinter.Canvas):
         
         return item
     
-    def _get_place_name(self, item = None):
+    def _get_place_id(self, item = None):
         """Get place name of the specified canvas item or the last clicked item if None given."""
         if not item:
             item = self._last_clicked_id
@@ -840,7 +795,7 @@ class PNEditor(Tkinter.Canvas):
         
         raise Exception('Place name not found!')
     
-    def _get_transition_name(self, item = None):
+    def _get_transition_id(self, item = None):
         """Get transition name of the specified canvas item or the last clicked item if None given."""
         if not item:
             item = self._last_clicked_id
@@ -878,7 +833,7 @@ class PNEditor(Tkinter.Canvas):
         place_id = self._draw_place_item(place = p)
         self._draw_marking(place_id, p)
         self.create_text(p.position.x,
-                       p.position.y + PetriNet.PLACE_LABEL_PADDING*self._current_scale,
+                       p.position.y + PLACE_LABEL_PADDING*self._current_scale,
                        tags = ('label',) + self.gettags(place_id),
                        text = str(p),
                        font = self.text_font )
@@ -890,9 +845,9 @@ class PNEditor(Tkinter.Canvas):
         trans_id = self._draw_transition_item(transition = t)
         
         if t.isHorizontal:
-            padding = PetriNet.TRANSITION_HORIZONTAL_LABEL_PADDING
+            padding = TRANSITION_HORIZONTAL_LABEL_PADDING
         else:
-            padding = PetriNet.TRANSITION_VERTICAL_LABEL_PADDING
+            padding = TRANSITION_VERTICAL_LABEL_PADDING
         
         if self._label_transitions:
             self.create_text(t.position.x,
@@ -906,21 +861,21 @@ class PNEditor(Tkinter.Canvas):
     def _remove_place(self):
         """Menu callback to remove clicked place."""
         self._hide_menu()
-        name = self._get_place_name()
-        p = self._petri_net.places[name]
+        place_id = self._get_place_id()
+        p = self._petri_net.places[place_id]
         incoming_arcs = p.incoming_arcs
         outgoing_arcs = p.outgoing_arcs
-        self.remove_place(name)
+        self.remove_place(place_id)
         self._add_to_undo(['remove_place', 'Remove Place.', p, incoming_arcs, outgoing_arcs, Vec2(self._offset), self._current_scale])
     
     def _remove_transition(self):
         """Menu callback to remove clicked transition."""
         self._hide_menu()
-        name = self._get_transition_name()
-        t = self._petri_net.transitions[name]
+        transition_id = self._get_transition_id()
+        t = self._petri_net.transitions[transition_id]
         incoming_arcs = t.incoming_arcs
         outgoing_arcs = t.outgoing_arcs
-        self.remove_transition(name)
+        self.remove_transition(transition_id)
         self._add_to_undo(['remove_transition', 'Remove Transition.', t, incoming_arcs, outgoing_arcs, Vec2(self._offset), self._current_scale])
     
     def _remove_arc(self):
@@ -963,14 +918,14 @@ class PNEditor(Tkinter.Canvas):
             then sets the entry widget for entering the new name.
         """
         self._hide_menu()
-        name = self._get_place_name()
+        place_id = self._get_place_id()
         
         #Adjust height when label is occluded
         #h = int(self.config()['height'][4])
         h = self.winfo_height()
         if h == 1:
             h = self.winfo_reqheight()
-        entry_y = self._last_point.y + (PetriNet.PLACE_LABEL_PADDING + 10)*self._current_scale + 10
+        entry_y = self._last_point.y + (PLACE_LABEL_PADDING + 10)*self._current_scale + 10
         if entry_y > h:
             diff = Vec2(0.0, h - entry_y)
             self.move('all', diff.x, diff.y)
@@ -983,7 +938,7 @@ class PNEditor(Tkinter.Canvas):
                 self._grid_offset = (self._grid_offset + diff).int
                 self._draw_grid()
         
-        p = self._petri_net.places[name]
+        p = self._petri_net.places[place_id]
         
         self.delete('label&&place_' + repr(p))
         canvas_id = self.find_withtag('place_' + repr(p))[0]
@@ -997,14 +952,14 @@ class PNEditor(Tkinter.Canvas):
             then sets the entry widget for entering the new name.  
         """
         self._hide_menu()
-        name = self._get_transition_name()
+        transition_id = self._get_transition_id()
         
         #Adjust height when label is occluded
         #h = int(self.config()['height'][4])
         h = self.winfo_height()
         if h == 1:
             h = self.winfo_reqheight()
-        entry_y = self._last_point.y + (PetriNet.TRANSITION_VERTICAL_LABEL_PADDING + 10)*self._current_scale + 10
+        entry_y = self._last_point.y + (TRANSITION_VERTICAL_LABEL_PADDING + 10)*self._current_scale + 10
         if entry_y > h:
             #old_t.position.y -= entry_y - h
             diff = Vec2(0.0, h - entry_y)
@@ -1018,7 +973,7 @@ class PNEditor(Tkinter.Canvas):
                 self._grid_offset = (self._grid_offset + diff).int
                 self._draw_grid()
         
-        t = self._petri_net.transitions[name]
+        t = self._petri_net.transitions[transition_id]
         
         self.delete('label&&transition_' + repr(t))
         canvas_id = self.find_withtag('transition_' + repr(t))[0]
@@ -1033,8 +988,8 @@ class PNEditor(Tkinter.Canvas):
         self.itemconfig('place', state = Tkinter.DISABLED)
         self.itemconfig('transition&&!label', outline = '#FFFF00', width = 5)
         self._connecting_place_fn_id = self.bind('<Motion>', self._connecting_place, '+')
-        name = self._get_place_name()
-        self._source = self._petri_net.places[name]
+        place_id = self._get_place_id()
+        self._source = self._petri_net.places[place_id]
         
     def _connecting_place(self, event):
         """Event callback to draw an arc when connecting a place."""
@@ -1043,29 +998,30 @@ class PNEditor(Tkinter.Canvas):
         self.delete('connecting')
         
         if item and 'transition' in self.gettags(item):
-            name = self._get_transition_name(item)
-            target = self._petri_net.transitions[name]
+            transition_id = self._get_transition_id(item)
+            target = self._petri_net.transitions[transition_id]
             place_vec = target.position - self._source.position
-            place_point = self._source.position + place_vec.unit*PetriNet.PLACE_RADIUS*self._current_scale
-            transition_point = self._find_intersection(target, self._source)
+            place_point = self._source.position + place_vec.unit*PLACE_RADIUS*self._current_scale
+            target_point = self._find_intersection(target, self._source.position)
             self.create_line(place_point.x,
                          place_point.y,
-                         transition_point.x,
-                         transition_point.y,
+                         target_point.x,
+                         target_point.y,
                          tags = ('connecting',),
-                         width = PetriNet.LINE_WIDTH,
+                         width = LINE_WIDTH,
                          arrow= Tkinter.LAST,
                          arrowshape = (10,12,5) )
         else:
-            target_pos = Vec2(event.x, event.y)
-            place_vec = target_pos - self._source.position
-            place_point = self._source.position + place_vec.unit*PetriNet.PLACE_RADIUS*self._current_scale
+            target_point = Vec2(event.x, event.y)
+            place_vec = target_point - self._source.position
+            place_point = self._source.position + place_vec.unit*PLACE_RADIUS*self._current_scale
+            
             self.create_line(place_point.x,
                          place_point.y,
-                         target_pos.x,
-                         target_pos.y,
+                         target_point.x,
+                         target_point.y,
                          tags = ('connecting',),
-                         width = PetriNet.LINE_WIDTH,
+                         width = LINE_WIDTH,
                          arrow= Tkinter.LAST,
                          arrowshape = (10,12,5) )
     
@@ -1077,8 +1033,8 @@ class PNEditor(Tkinter.Canvas):
         self.itemconfig('transition', state = Tkinter.DISABLED)
         self.itemconfig('place&&!label&&!token', outline = '#FFFF00', width = 5)
         self._connecting_transition_fn_id = self.bind('<Motion>', self._connecting_transition, '+')
-        name = self._get_transition_name()
-        self._source = self._petri_net.transitions[name]
+        transition_id = self._get_transition_id()
+        self._source = self._petri_net.transitions[transition_id]
         
     def _connecting_transition(self, event):
         """Event callback to draw an arc when connecting a transition."""
@@ -1088,34 +1044,35 @@ class PNEditor(Tkinter.Canvas):
         self.delete('connecting')
         
         if item and 'place' in self.gettags(item):
-            name = self._get_place_name(item)
-            target = self._petri_net.places[name]
+            place_id = self._get_place_id(item)
+            target = self._petri_net.places[place_id]
             place_vec = self._source.position - target.position
-            target_point = target.position + place_vec.unit*PetriNet.PLACE_RADIUS*self._current_scale
+            target_point = target.position + place_vec.unit*PLACE_RADIUS*self._current_scale
         else:
             target_point = Vec2(event.x, event.y)
         
-        transition_point = self._find_intersection(self._source, target)
+        transition_point = self._find_intersection(self._source, target_point)
+        
         self.create_line(transition_point.x,
                      transition_point.y,
                      target_point.x,
                      target_point.y,
                      tags = ('connecting',),
-                     width = PetriNet.LINE_WIDTH,
+                     width = LINE_WIDTH,
                      arrow= Tkinter.LAST,
                      arrowshape = (10,12,5) )
     
     def _switch_orientation(self):
         """Menu callback to switch clicked transition's orientation."""
         self._hide_menu()
-        name = self._get_transition_name()
+        transition_id = self._get_transition_id()
         
-        t = self._petri_net.transitions[name]
+        t = self._petri_net.transitions[transition_id]
         t.isHorizontal = not t.isHorizontal
         
-        self.delete('source_' + name)
-        self.delete('target_' + name)
-        self.delete('transition_' + name)
+        self.delete('source_' + transition_id)
+        self.delete('target_' + transition_id)
+        self.delete('transition_' + transition_id)
         
         self._draw_transition(t)
         self._draw_item_arcs(t)
@@ -1126,8 +1083,8 @@ class PNEditor(Tkinter.Canvas):
     def _set_initial_marking(self):
         """Menu callback to set the initial marking of a Place."""
         self._hide_menu()
-        name = self._get_place_name()
-        p = self._petri_net.places[name]
+        place_id = self._get_place_id()
+        p = self._petri_net.places[place_id]
         
         txtbox = Tkinter.Entry(self)
         txtbox.insert(0, str(p.init_marking))
@@ -1143,8 +1100,8 @@ class PNEditor(Tkinter.Canvas):
     def _set_capacity(self):
         """Menu callback to set the capacity of a Place."""
         self._hide_menu()
-        name = self._get_place_name()
-        p = self._petri_net.places[name]
+        place_id = self._get_place_id()
+        p = self._petri_net.places[place_id]
         
         dialog = PositiveIntDialog('Set place capacity', 'Write a positive number for \nthe capacity of place: ' + str(p), 'Capacity', init_value = p.capacity)
         dialog.window.transient(self)
@@ -1157,8 +1114,8 @@ class PNEditor(Tkinter.Canvas):
     def _set_rate(self):
         """Menu callback to set the rate of a Transition."""
         self._hide_menu()
-        name = self._get_transition_name()
-        t = self._petri_net.transitions[name]
+        transition_id = self._get_transition_id()
+        t = self._petri_net.transitions[transition_id]
         
         dialog = NonNegativeFloatDialog("Set transition's rate", 'Write a positive decimal number for \nthe rate of transition: ' + str(t), 'Rate', init_value = t.rate)
         dialog.window.transient(self)
@@ -1171,8 +1128,8 @@ class PNEditor(Tkinter.Canvas):
     def _set_priority(self):
         """Menu callback to set the priority of a Transition."""
         self._hide_menu()
-        name = self._get_transition_name()
-        t = self._petri_net.transitions[name]
+        transition_id = self._get_transition_id()
+        t = self._petri_net.transitions[transition_id]
         
         dialog = PositiveIntDialog("Set transition's priority", 'Write a positive integer for \nthe priority of transition: ' + str(t), 'Priority', init_value = t.priority)
         dialog.window.transient(self)
@@ -1304,25 +1261,12 @@ class PNEditor(Tkinter.Canvas):
                          fill = 'black',
                          font = self.text_font )
     
-    def _create_unordered_fact_place(self):
-        """Menu callback to create an UNORDERED_FACT place."""
+    def _create_regular_place(self):
+        """Menu callback to create a REGULAR place."""
         self._hide_menu()
-        placeType = PlaceTypes.UNORDERED_FACT
-        self._create_place(placeType)
-    
-    def _create_structured_fact_place(self):
-        """Menu callback to create a STRUCTURED_FACT place."""
-        self._hide_menu()
-        placeType = PlaceTypes.STRUCTURED_FACT
-        self._create_place(placeType)
-    
-    def _create_function_place(self):
-        """Menu callback to create a FUNCTION place."""
-        self._hide_menu()
-        placeType = PlaceTypes.FUNCTION
-        self._create_place(placeType)
+        self._create_place(PlaceClass = Place)
         
-    def _create_place(self, placeType):
+    def _create_place(self, PlaceClass):
         """Creates a Place object, draws it and sets the label entry for entering the name."""
         
         #Adjust height when label is occluded
@@ -1330,7 +1274,7 @@ class PNEditor(Tkinter.Canvas):
         h = self.winfo_height()
         if h == 1:
             h = self.winfo_reqheight()
-        entry_y = self._last_point.y + (PetriNet.PLACE_LABEL_PADDING + 10)*self._current_scale + 10
+        entry_y = self._last_point.y + (PLACE_LABEL_PADDING + 10)*self._current_scale + 10
         if entry_y > h:
             diff = Vec2(0.0, h - entry_y)
             self.move('all', diff.x, diff.y)
@@ -1345,23 +1289,16 @@ class PNEditor(Tkinter.Canvas):
             
             self._last_point += diff
         
-        item = self._draw_place_item(self._last_point, placeType)
-        p = Place('P{:0>3d}'.format(self._petri_net._place_counter + 1), placeType, self._last_point)
+        item = self._draw_place_item(self._last_point, PlaceClass = PlaceClass)
+        p = PlaceClass('P{0:0>3d}'.format(self._petri_net._place_counter + 1), self._last_point)
         self._set_create_place_entry(item, p)
     
-    def _create_immediate_transition(self):
-        """Menu callback to create an IMMEDIATE transition."""
+    def _create_regular_transition(self):
+        """Menu callback to create a REGULAR transition."""
         self._hide_menu()
-        transitionType = TransitionTypes.IMMEDIATE
-        self._create_transition(transitionType)
+        self._create_transition(Transition)
     
-    def _create_stochastic_transition(self):
-        """Menu callback to create a TIMED_STOCHASTIC transition."""
-        self._hide_menu()
-        transitionType = TransitionTypes.TIMED_STOCHASTIC
-        self._create_transition(transitionType)
-    
-    def _create_transition(self, transitionType):
+    def _create_transition(self, TransitionClass):
         """Creates a Transition object, draws it and sets the label entry for entering the name."""
         
         #Adjust height when label is occluded
@@ -1369,7 +1306,7 @@ class PNEditor(Tkinter.Canvas):
         h = self.winfo_height()
         if h == 1:
             h = self.winfo_reqheight()
-        entry_y = self._last_point.y + (PetriNet.TRANSITION_VERTICAL_LABEL_PADDING + 10)*self._current_scale + 10
+        entry_y = self._last_point.y + (TRANSITION_VERTICAL_LABEL_PADDING + 10)*self._current_scale + 10
         if entry_y > h:
             diff = Vec2(0.0, h - entry_y)
             self.move('all', diff.x, diff.y)
@@ -1383,12 +1320,12 @@ class PNEditor(Tkinter.Canvas):
                 self._draw_grid()
             self._last_point += diff
         
-        item = self._draw_transition_item(self._last_point, transitionType)
-        t = Transition('T{:0>3d}'.format(self._petri_net._transition_counter + 1), transitionType, self._last_point)
+        item = self._draw_transition_item(self._last_point, TransitionClass)
+        t = TransitionClass('{0:0>3d}'.format(self._petri_net._transition_counter + 1), self._last_point)
         self._set_create_transition_entry(item, t)
     
-    def _draw_place_item(self, point = None, placeType = PlaceTypes.UNORDERED_FACT, place = None):
-        """Draws a place item, with the attributes corresponding to the place type.
+    def _draw_place_item(self, point = None, PlaceClass = Place, place = None):
+        """Draws a place item, with the attributes corresponding to the place class.
         
             Returns the id generated by the canvas widget.
         """
@@ -1397,27 +1334,27 @@ class PNEditor(Tkinter.Canvas):
         if place:
             point = place.position
             place_tag = 'place_' + repr(place)
-            placeType = place.type
-        elif not point:
-            point = Vec2()
+            PlaceClass = place.__class__
+        elif not (point and PlaceClass):
+            raise Exception('Neither location nor place class was specified.')
             
         
-        item = self.create_oval(point.x - PetriNet.PLACE_RADIUS,
-                         point.y - PetriNet.PLACE_RADIUS,
-                         point.x + PetriNet.PLACE_RADIUS,
-                         point.y + PetriNet.PLACE_RADIUS,
-                         tags = ('place', placeType, place_tag),
-                         width = PetriNet.LINE_WIDTH,
-                         fill = PetriNet.PLACE_CONFIG[placeType]['fill'],
-                         outline = PetriNet.PLACE_CONFIG[placeType]['outline'],
+        item = self.create_oval(point.x - PLACE_RADIUS,
+                         point.y - PLACE_RADIUS,
+                         point.x + PLACE_RADIUS,
+                         point.y + PLACE_RADIUS,
+                         tags = ('place', PlaceClass.__name__, place_tag),
+                         width = LINE_WIDTH,
+                         fill = PlaceClass.FILL_COLOR,
+                         outline = PlaceClass.OUTLINE_COLOR,
                          disabledfill = '#888888',
                          disabledoutline = '#888888' )
         self.addtag_withtag('p_' + str(item), item)
         self.scale(item, point.x, point.y, self._current_scale, self._current_scale)
         return item
     
-    def _draw_transition_item(self, point = None, transitionType = TransitionTypes.IMMEDIATE, transition = None):
-        """Draws a transition item, with the attributes corresponding to the transition type.
+    def _draw_transition_item(self, point = None, TransitionClass = Transition, transition = None):
+        """Draws a transition item, with the attributes corresponding to the transition class.
         
             Returns the id generated by the canvas widget.
         """
@@ -1427,26 +1364,25 @@ class PNEditor(Tkinter.Canvas):
         if transition:
             point = transition.position
             transition_tag = 'transition_' + repr(transition)
-            transitionType = transition.type
-        elif not point:
-            point = Vec2()
+        elif not (point and TransitionClass):
+            raise Exception('Neither location nor transition class was specified.')
         
-        x0 = point.x - PetriNet.TRANSITION_HALF_SMALL
-        y0 = point.y - PetriNet.TRANSITION_HALF_LARGE
-        x1 = point.x + PetriNet.TRANSITION_HALF_SMALL
-        y1 = point.y + PetriNet.TRANSITION_HALF_LARGE
+        x0 = point.x - TRANSITION_HALF_SMALL
+        y0 = point.y - TRANSITION_HALF_LARGE
+        x1 = point.x + TRANSITION_HALF_SMALL
+        y1 = point.y + TRANSITION_HALF_LARGE
         
         if transition and transition.isHorizontal:
-            x0 = point.x - PetriNet.TRANSITION_HALF_LARGE
-            y0 = point.y - PetriNet.TRANSITION_HALF_SMALL
-            x1 = point.x + PetriNet.TRANSITION_HALF_LARGE
-            y1 = point.y + PetriNet.TRANSITION_HALF_SMALL
+            x0 = point.x - TRANSITION_HALF_LARGE
+            y0 = point.y - TRANSITION_HALF_SMALL
+            x1 = point.x + TRANSITION_HALF_LARGE
+            y1 = point.y + TRANSITION_HALF_SMALL
         
         item = self.create_rectangle(x0, y0, x1, y1,
-                         tags = ('transition', transitionType, transition_tag),
-                         width = PetriNet.LINE_WIDTH,
-                         fill = PetriNet.TRANSITION_CONFIG[transitionType]['fill'],
-                         outline = PetriNet.TRANSITION_CONFIG[transitionType]['outline'],
+                         tags = ('transition', TransitionClass.__name__, transition_tag),
+                         width = LINE_WIDTH,
+                         fill = TransitionClass.FILL_COLOR,
+                         outline = TransitionClass.OUTLINE_COLOR,
                          disabledfill = '#888888',
                          disabledoutline = '#888888' )
         
@@ -1462,9 +1398,9 @@ class PNEditor(Tkinter.Canvas):
         """
         txtbox = Tkinter.Entry(self)
         txtbox.insert(0, str(p))
-        txtbox.selection_range(2, Tkinter.END)
+        txtbox.selection_range(0, Tkinter.END)
         #extra padding because entry position refers to the center, not the corner
-        label_padding = PetriNet.PLACE_LABEL_PADDING + 10
+        label_padding = PLACE_LABEL_PADDING + 10
         
         txtbox_id = self.create_window(p.position.x, p.position.y + label_padding*self._current_scale, height= 20, width = 85, window = txtbox)
         txtbox.grab_set()
@@ -1485,12 +1421,12 @@ class PNEditor(Tkinter.Canvas):
         """
         txtbox = Tkinter.Entry(self)
         txtbox.insert(0, str(t))
-        txtbox.selection_range(2, Tkinter.END)
+        txtbox.selection_range(0, Tkinter.END)
         #extra padding because entry position refers to the center, not the corner
         if t.isHorizontal:
-            label_padding = PetriNet.TRANSITION_HORIZONTAL_LABEL_PADDING + 10
+            label_padding = TRANSITION_HORIZONTAL_LABEL_PADDING + 10
         else:
-            label_padding = PetriNet.TRANSITION_VERTICAL_LABEL_PADDING + 10
+            label_padding = TRANSITION_VERTICAL_LABEL_PADDING + 10
         
         txtbox_id = self.create_window(t.position.x, t.position.y + label_padding*self._current_scale, height= 20, width = 85, window = txtbox)
         txtbox.grab_set()
@@ -1507,28 +1443,26 @@ class PNEditor(Tkinter.Canvas):
         """Callback factory function for the <KeyPress-Return> event of the 'create place' entry widget."""
         def txtboxCallback(event):
             txt = txtbox.get()
-            if not (txt[:2] == p.type[0] + '.' and PNEditor._NAME_REGEX.match(txt[2:])):
-                msg = ('A place name must begin with the first letter of its type and a dot, ' +
-                    'followed by a non-empty string, preferably composed of only ' +
-                    'alphanumeric characters, dashes or underscores, and possibly spaces. \
-                     \
-                    Examples: a.my_Action, t.task1')
-                tkMessageBox.showerror('Invalid Name', msg)
+            
+            try:
+                p.name = txt
+            except Exception as e:
+                tkMessageBox.showerror('Invalid Name', e)
                 return
-            new_p = Place(txt[2:], p.type, p.position, p.init_marking, p.capacity)
-            label_padding = PetriNet.PLACE_LABEL_PADDING
             
-            self._petri_net.add_place(new_p)
+            label_padding = PLACE_LABEL_PADDING
             
-            self.addtag_withtag('place_' + repr(new_p), canvas_id)
+            self._petri_net.add_place(p)
+            
+            self.addtag_withtag('place_' + repr(p), canvas_id)
             tags = ('label',) + self.gettags(canvas_id)
-            self.create_text(new_p.position.x,
-                             new_p.position.y + label_padding*self._current_scale,
-                             text = str(new_p),
+            self.create_text(p.position.x,
+                             p.position.y + label_padding*self._current_scale,
+                             text = str(p),
                              tags=tags,
                              font = self.text_font )
             
-            self._add_to_undo(['create_place', 'Create Place.', new_p, Vec2(self._offset), self._current_scale])
+            self._add_to_undo(['create_place', 'Create Place.', p, Vec2(self._offset), self._current_scale])
             self.edited = True
             txtbox.grab_release()
             txtbox.destroy()
@@ -1540,32 +1474,29 @@ class PNEditor(Tkinter.Canvas):
         """Callback factory function for the <KeyPress-Return> event of the 'create transition' entry widget."""
         def txtboxCallback(event):
             txt = txtbox.get()
-            if not (txt[:2] == t.type[0] + '.' and PNEditor._NAME_REGEX.match(txt[2:])):
-                msg = ("A transition name must begin with an 'i' and a dot if it's an immediate transition " +
-                       "or an 's' and a dot if it's a timed_stochastic transition, " + 
-                       "followed by a non-empty string, preferably composed of only " +
-                       "alphanumeric characters, dashes or underscores, and possibly spaces. \
-                       \
-                       Example: i.transition1, s.t-2")
-                tkMessageBox.showerror('Invalid Name', msg)
-                return
-            new_t = Transition(txt[2:], t.type, t.position, t.isHorizontal, t.rate, t.priority)
-            if new_t.isHorizontal:
-                label_padding = PetriNet.TRANSITION_HORIZONTAL_LABEL_PADDING
-            else:
-                label_padding = PetriNet.TRANSITION_VERTICAL_LABEL_PADDING
-                
-            self._petri_net.add_transition(new_t)
             
-            self.addtag_withtag('transition_' + repr(new_t), canvas_id)
+            try:
+                t.name = txt
+            except Exception as e:
+                tkMessageBox.showerror('Invalid Name', e)
+                return
+            
+            if t.isHorizontal:
+                label_padding = TRANSITION_HORIZONTAL_LABEL_PADDING
+            else:
+                label_padding = TRANSITION_VERTICAL_LABEL_PADDING
+                
+            self._petri_net.add_transition(t)
+            
+            self.addtag_withtag('transition_' + repr(t), canvas_id)
             tags = ('label',) + self.gettags(canvas_id)
             if self._label_transitions:
-                self.create_text(new_t.position.x,
-                                 new_t.position.y + label_padding*self._current_scale,
-                                 text = str(new_t),
+                self.create_text(t.position.x,
+                                 t.position.y + label_padding*self._current_scale,
+                                 text = str(t),
                                  tags=tags,
                                  font = self.text_font )
-            self._add_to_undo(['create_transition', 'Create Transition.', new_t, Vec2(self._offset), self._current_scale])
+            self._add_to_undo(['create_transition', 'Create Transition.', t, Vec2(self._offset), self._current_scale])
             self.edited = True
             txtbox.grab_release()
             txtbox.destroy()
@@ -1591,10 +1522,10 @@ class PNEditor(Tkinter.Canvas):
         """
         txtbox = Tkinter.Entry(self)
         txtbox.insert(0, str(p))
-        txtbox.selection_range(2, Tkinter.END)
+        txtbox.selection_range(0, Tkinter.END)
         
         #extra padding because entry position refers to the center, not the corner
-        label_padding = PetriNet.PLACE_LABEL_PADDING + 10
+        label_padding = PLACE_LABEL_PADDING + 10
         
         txtbox_id = self.create_window(p.position.x, p.position.y + label_padding*self._current_scale, height= 20, width = 85, window = txtbox)
         txtbox.grab_set()
@@ -1615,13 +1546,13 @@ class PNEditor(Tkinter.Canvas):
         """
         txtbox = Tkinter.Entry(self)
         txtbox.insert(0, str(t))
-        txtbox.selection_range(2, Tkinter.END)
+        txtbox.selection_range(0, Tkinter.END)
         
         #extra padding because entry position refers to the center, not the corner
         if t.isHorizontal:
-            label_padding = PetriNet.TRANSITION_HORIZONTAL_LABEL_PADDING + 10
+            label_padding = TRANSITION_HORIZONTAL_LABEL_PADDING + 10
         else:
-            label_padding = PetriNet.TRANSITION_VERTICAL_LABEL_PADDING + 10
+            label_padding = TRANSITION_VERTICAL_LABEL_PADDING + 10
         
         txtbox_id = self.create_window(t.position.x, t.position.y + label_padding*self._current_scale, height= 20, width = 85, window = txtbox)
         txtbox.grab_set()
@@ -1639,20 +1570,16 @@ class PNEditor(Tkinter.Canvas):
         def txtboxCallback(event):
             old_name = p.name
             txt = txtbox.get()
-            if not (txt[:2] == p.type[0] + '.' and PNEditor._NAME_REGEX.match(txt[2:])):
-                msg = ('A place name must begin with the first letter of its type and a dot, ' +
-                    'followed by a non-empty string, preferably composed of only ' +
-                    'alphanumeric characters, dashes or underscores, and possibly spaces. \
-                     \
-                    Examples: a.my_Action, t.task1')
-                tkMessageBox.showerror('Invalid Name', msg)
-                return
             
-            self._petri_net.places[repr(p)].name = txt[2:]
+            try:
+                p.name = txt
+            except Exception as e:
+                tkMessageBox.showerror('Invalid Name', e)
+                return
                         
             tags = ('label',) + self.gettags(canvas_id)
             self.create_text(p.position.x,
-                             p.position.y + PetriNet.PLACE_LABEL_PADDING*self._current_scale,
+                             p.position.y + PLACE_LABEL_PADDING*self._current_scale,
                              text = str(p),
                              tags=tags,
                              font = self.text_font )
@@ -1669,22 +1596,17 @@ class PNEditor(Tkinter.Canvas):
         def txtboxCallback(event):
             old_name = t.name
             txt = txtbox.get()
-            if not (txt[:2] == t.type[0] + '.' and PNEditor._NAME_REGEX.match(txt[2:])):
-                msg = ("A transition name must begin with an 'i' and a dot if it's an immediate transition " +
-                       "or an 's' and a dot if it's a timed_stochastic transition, " + 
-                       "followed by a non-empty string, preferably composed of only " +
-                       "alphanumeric characters, dashes or underscores, and possibly spaces. \
-                       \
-                       Example: i.transition1, s.t-2")
-                tkMessageBox.showerror('Invalid Name', msg)
+            
+            try:
+                t.name = txt
+            except Exception as e:
+                tkMessageBox.showerror('Invalid Name', e)
                 return
             
-            self._petri_net.transitions[repr(t)].name = txt[2:]
-            
             if t.isHorizontal:
-                label_padding = PetriNet.TRANSITION_HORIZONTAL_LABEL_PADDING + 10
+                label_padding = TRANSITION_HORIZONTAL_LABEL_PADDING + 10
             else:
-                label_padding = PetriNet.TRANSITION_VERTICAL_LABEL_PADDING + 10
+                label_padding = TRANSITION_VERTICAL_LABEL_PADDING + 10
             tags = ('label',) + self.gettags(canvas_id)
             if self._label_transitions:
                 self.create_text(t.position.x,
@@ -1703,7 +1625,7 @@ class PNEditor(Tkinter.Canvas):
     def _get_cancel_rename_place_callback(self, txtbox, txtbox_id, canvas_id, p):
         """Callback factory function for the <KeyPress-Escape> event of the 'rename place' entry widget."""
         def escape_callback(event):
-            label_padding = PetriNet.PLACE_LABEL_PADDING
+            label_padding = PLACE_LABEL_PADDING
             tags = ('label',) + self.gettags(canvas_id)
             self.create_text(p.position.x,
                              p.position.y + label_padding*self._current_scale,
@@ -1721,9 +1643,9 @@ class PNEditor(Tkinter.Canvas):
         """Callback factory function for the <KeyPress-Escape> event of the 'rename transition' entry widget."""
         def escape_callback(event):
             if t.isHorizontal:
-                label_padding = PetriNet.TRANSITION_HORIZONTAL_LABEL_PADDING
+                label_padding = TRANSITION_HORIZONTAL_LABEL_PADDING
             else:
-                label_padding = PetriNet.TRANSITION_VERTICAL_LABEL_PADDING
+                label_padding = TRANSITION_VERTICAL_LABEL_PADDING
             tags = ('label',) + self.gettags(canvas_id)
             if self._label_transitions:
                 self.create_text(t.position.x,
@@ -1751,8 +1673,8 @@ class PNEditor(Tkinter.Canvas):
         place_vec = t.position - p.position
         #trans_vec = -place_vec
         #transition_point = self._find_intersection(t, trans_vec)
-        place_point = p.position + place_vec.unit*PetriNet.PLACE_RADIUS*self._current_scale
-        transition_point = self._find_intersection(t, p)
+        place_point = p.position + place_vec.unit*PLACE_RADIUS*self._current_scale
+        transition_point = self._find_intersection(t, p.position)
         
         if isinstance(arc.source, Place):
             src_point = place_point
@@ -1769,7 +1691,7 @@ class PNEditor(Tkinter.Canvas):
                          trgt_point.x,
                          trgt_point.y,
                          tags = tags,
-                         width = PetriNet.LINE_WIDTH,
+                         width = LINE_WIDTH,
                          arrow= Tkinter.LAST,
                          arrowshape = (10,12,5) )
         else:
@@ -1795,19 +1717,19 @@ class PNEditor(Tkinter.Canvas):
                          trgt_point.x,
                          trgt_point.y,
                          tags = tags,
-                         width = PetriNet.LINE_WIDTH )
+                         width = LINE_WIDTH )
             
             self.create_oval(origin.x - radius,
                              origin.y - radius,
                              origin.x + radius,
                              origin.y + radius,
                              tags = tags,
-                             width = PetriNet.LINE_WIDTH)
+                             width = LINE_WIDTH)
             
         
         if arc.weight > 1:
             arc_vec = arc.target.position - arc.source.position
-            offset = Vec2(arc_vec.unit.y, -arc_vec.unit.x)*PetriNet.PLACE_RADIUS/2
+            offset = Vec2(arc_vec.unit.y, -arc_vec.unit.x)*PLACE_RADIUS/2
             text_pos = (src_point + trgt_point)/2 + offset
             self.create_text(text_pos.x,
                              text_pos.y,
@@ -1816,21 +1738,21 @@ class PNEditor(Tkinter.Canvas):
                              font = self.text_font
                              )
     
-    def _find_intersection(self, t, p):
+    def _find_intersection(self, t, point):
         """This is used to compute the point where an arc hits an edge
             of a transition's graphic representation (rectangle)."""
         
         if t.isHorizontal:
-            half_width = PetriNet.TRANSITION_HALF_LARGE
-            half_height = PetriNet.TRANSITION_HALF_SMALL
+            half_width = TRANSITION_HALF_LARGE
+            half_height = TRANSITION_HALF_SMALL
         else:
-            half_width = PetriNet.TRANSITION_HALF_SMALL
-            half_height = PetriNet.TRANSITION_HALF_LARGE
+            half_width = TRANSITION_HALF_SMALL
+            half_height = TRANSITION_HALF_LARGE
         
         half_width *= self._current_scale
         half_height *= self._current_scale
         
-        vec = p.position - t.position
+        vec = point - t.position
         
         if vec.x < 0:
             half_width *= -1
@@ -1839,7 +1761,7 @@ class PNEditor(Tkinter.Canvas):
         
         pos = t.position + Vec2(half_width*min(abs(vec.x)/300,1), half_height*min(abs(vec.y)/300,1))
         
-        vec = p.position - pos
+        vec = point - pos
         
         #vec2 = "closest corner from vector from t to p" - pos
         vec2 = t.position + Vec2(half_width, half_height) - pos
@@ -1872,11 +1794,11 @@ class PNEditor(Tkinter.Canvas):
         #NOTE: vec is a vector from the transition's center
         
         if t.isHorizontal:
-            half_width = PetriNet.TRANSITION_HALF_LARGE
-            half_height = PetriNet.TRANSITION_HALF_SMALL
+            half_width = TRANSITION_HALF_LARGE
+            half_height = TRANSITION_HALF_SMALL
         else:
-            half_width = PetriNet.TRANSITION_HALF_SMALL
-            half_height = PetriNet.TRANSITION_HALF_LARGE
+            half_width = TRANSITION_HALF_SMALL
+            half_height = TRANSITION_HALF_LARGE
         
         half_width *= self._current_scale
         half_height *= self._current_scale
@@ -1903,21 +1825,21 @@ class PNEditor(Tkinter.Canvas):
         return t.position + Vec2(x, y)
     '''
     
-    def _get_intersection_side(self, t, p):
+    def _get_intersection_side(self, t, point):
         """This is used to compute the side where an arc hits an edge
             of a transition's graphic representation (rectangle)."""
         
         if t.isHorizontal:
-            half_width = PetriNet.TRANSITION_HALF_LARGE
-            half_height = PetriNet.TRANSITION_HALF_SMALL
+            half_width = TRANSITION_HALF_LARGE
+            half_height = TRANSITION_HALF_SMALL
         else:
-            half_width = PetriNet.TRANSITION_HALF_SMALL
-            half_height = PetriNet.TRANSITION_HALF_LARGE
+            half_width = TRANSITION_HALF_SMALL
+            half_height = TRANSITION_HALF_LARGE
         
         half_width *= self._current_scale
         half_height *= self._current_scale
         
-        vec = p.position - t.position
+        vec = point - t.position
         
         if vec.x < 0:
             half_width *= -1
@@ -1926,7 +1848,7 @@ class PNEditor(Tkinter.Canvas):
         
         pos = t.position + Vec2(half_width*min(abs(vec.x)/300,1), half_height*min(abs(vec.y)/300,1))
         
-        vec = p.position - pos
+        vec = point - pos
         
         #vec2 = "closest corner" - pos
         vec2 = t.position + Vec2(half_width, half_height) - pos
@@ -2067,14 +1989,16 @@ class PNEditor(Tkinter.Canvas):
             self._state = 'normal'
             self.grab_release()
             self.itemconfig('place', state = Tkinter.NORMAL)
-            self.itemconfig('transition&&' + TransitionTypes.IMMEDIATE + '&&!label', outline = PetriNet.TRANSITION_CONFIG[TransitionTypes.IMMEDIATE]['outline'], width = PetriNet.LINE_WIDTH)
-            self.itemconfig('transition&&' + TransitionTypes.TIMED_STOCHASTIC + '&&!label', outline = PetriNet.TRANSITION_CONFIG[TransitionTypes.TIMED_STOCHASTIC]['outline'], width = PetriNet.LINE_WIDTH)
+            
+            for tc in TRANSITION_CLASSES:
+                self.itemconfig('transition&&' + tc.__name__ + '&&!label', outline = tc.OUTLINE_COLOR, width = LINE_WIDTH)
+            
             self.unbind('<Motion>', self._connecting_place_fn_id)
             self.delete('connecting')
             item = self._get_current_item(event)
         
             if item and 'transition' in self.gettags(item):
-                name = self._get_transition_name(item)
+                name = self._get_transition_id(item)
                 target = self._petri_net.transitions[name]
                 self.add_arc(self._source, target)
                 self._add_to_undo(['create_arc', 'Create Arc.', self._source, target])
@@ -2084,15 +2008,16 @@ class PNEditor(Tkinter.Canvas):
             self._state = 'normal'
             self.grab_release()
             self.itemconfig('transition', state = Tkinter.NORMAL)
-            self.itemconfig('place&&' + PlaceTypes.UNORDERED_FACT + '&&!label&&!token', outline = PetriNet.PLACE_CONFIG[PlaceTypes.UNORDERED_FACT]['outline'], width = PetriNet.LINE_WIDTH)
-            self.itemconfig('place&&' + PlaceTypes.STRUCTURED_FACT + '&&!label&&!token', outline = PetriNet.PLACE_CONFIG[PlaceTypes.STRUCTURED_FACT]['outline'], width = PetriNet.LINE_WIDTH)
-            self.itemconfig('place&&' + PlaceTypes.FUNCTION + '&&!label&&!token', outline = PetriNet.PLACE_CONFIG[PlaceTypes.FUNCTION]['outline'], width = PetriNet.LINE_WIDTH)
+            
+            for pc in PLACE_CLASSES:
+                self.itemconfig('place&&' + pc.__name__ + '&&!label&&!token', outline = pc.OUTLINE_COLOR, width = LINE_WIDTH)
+            
             self.unbind('<Motion>', self._connecting_transition_fn_id)
             self.delete('connecting')
             item = self._get_current_item(event)
         
             if item and 'place' in self.gettags(item):
-                name = self._get_place_name(item)
+                name = self._get_place_id(item)
                 target = self._petri_net.places[name]
                 self.add_arc(self._source, target)
                 self._add_to_undo(['create_arc', 'Create Arc.', self._source, target])
