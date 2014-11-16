@@ -98,7 +98,9 @@ class PNEditor(Tkinter.Canvas):
         self._place_menu.add_separator()
         self._place_menu.add_command(label = 'Remove Place', command = self._remove_place)
         self._place_menu.add_separator()
-        self._place_menu.add_command(label = 'Connect to...', command = self._connect_place_to)
+        self._place_menu.add_command(label = 'Connect to...', command = self._connect_place_to, accelerator="(Double click)")
+        self._place_menu.add_command(label = 'Connect to... (bidirectional)', command = self._connect_place_to_bidirectional, accelerator="(Shift+Double click)")
+        self._place_menu.add_command(label = 'Connect to...(inhibitor)', command = self._connect_place_to_inhibitor, accelerator="(Control+Double click)")
         
         self._transition_menu = Tkinter.Menu(self, tearoff = 0)
         self._transition_menu.add_command(label = 'Rename Transition', command = self._rename_transition)
@@ -108,7 +110,8 @@ class PNEditor(Tkinter.Canvas):
         self._transition_menu.add_separator()
         self._transition_menu.add_command(label = 'Remove Transition', command = self._remove_transition)
         self._transition_menu.add_separator()
-        self._transition_menu.add_command(label = 'Connect to...', command = self._connect_transition_to)
+        self._transition_menu.add_command(label = 'Connect to...', command = self._connect_transition_to, accelerator="(Double click)")
+        self._transition_menu.add_command(label = 'Connect to...(bidirectional)', command = self._connect_transition_to_bidirectional, accelerator="(Shift+Double click)")
         
         self._arc_menu = Tkinter.Menu(self, tearoff = 0)
         self._arc_menu.add_command(label = 'Set weight', command = self._set_weight)
@@ -128,6 +131,8 @@ class PNEditor(Tkinter.Canvas):
         
         self._popped_up_menu = None
         self._state = 'normal'
+        self._connecting_double = False
+        self._connecting_inhibitor = False
         self.status_var = Tkinter.StringVar()
         self.status_var.set('Ready')
         
@@ -169,6 +174,8 @@ class PNEditor(Tkinter.Canvas):
             self.bind('<3>', self._popup_menu)
         
         self.bind('<Double-1>', self._set_connecting)
+        self.bind('<Shift-Double-1>', self._set_connecting_double)
+        self.bind('<Control-Double-1>', self._set_connecting_inhibitor)
         #self.bind('<Double-1>', self._test)
     
     '''
@@ -203,6 +210,159 @@ class PNEditor(Tkinter.Canvas):
                 self._connect_place_to()
             elif 'transition' in tags:
                 self._connect_transition_to()
+    
+    def _set_connecting_double(self, event):
+        
+        if self._state != 'normal':
+            return
+        
+        self._connecting_double = True
+        self._set_connecting(event)
+    
+    def _set_connecting_inhibitor(self, event):
+        
+        self.focus_set()
+        
+        if self._state != 'normal':
+            return
+        
+        item = self._get_current_item(event)
+        
+        self._last_point = Vec2(event.x, event.y)
+        self._last_clicked_id = item
+        
+        if item:
+            tags = self.gettags(item)
+            if 'place' in tags:
+                self._connecting_inhibitor = True
+                self._connect_place_to()
+    
+    def _connect_place_to(self):
+        """Menu callback to connect clicked place to a transition."""
+        self._hide_menu()
+        self._state = 'connecting_place'
+        self.grab_set()
+        self.itemconfig('place', state = Tkinter.DISABLED)
+        self.itemconfig('transition&&!label', outline = '#FFFF00', width = 5)
+        self._connecting_place_fn_id = self.bind('<Motion>', self._connecting_place, '+')
+        place_id = self._get_place_id()
+        self._source = self._petri_net.places[place_id]
+    
+    def _connect_place_to_bidirectional(self):
+        self._connecting_double = True
+        self._connect_place_to()
+    
+    def _connect_place_to_inhibitor(self):
+        self._connecting_inhibitor = True
+        self._connect_place_to()
+    
+    def _connecting_place(self, event):
+        """Event callback to draw an arc when connecting a place."""
+        
+        item = self._get_current_item(event)
+        self.delete('connecting')
+        
+        if item and 'transition' in self.gettags(item):
+            transition_id = self._get_transition_id(item)
+            target = self._petri_net.transitions[transition_id]
+            target_point = self._find_intersection(target, self._source.position)
+            
+            if self._connecting_inhibitor:
+                radius = 6
+                origin = target_point
+                
+                side = self._get_intersection_side(target, self._source.position)
+                if side == 'top':
+                    origin.y -= radius
+                elif side == 'bottom':
+                    origin.y += radius
+                elif side == 'left':
+                    origin.x -= radius            
+                else:
+                    origin.x += radius
+                
+                target_point = origin + radius*(self._source.position - origin).unit
+            
+        else:
+            target_point = Vec2(event.x, event.y)
+            
+            if self._connecting_inhibitor:
+                radius = 6
+                origin = target_point
+                
+                target_point = origin + radius*(self._source.position - origin).unit
+        
+        place_vec = target_point - self._source.position
+        place_point = self._source.position + place_vec.unit*PLACE_RADIUS*self._current_scale
+        
+        if self._connecting_inhibitor:
+            self.create_line(place_point.x,
+                         place_point.y,
+                         target_point.x,
+                         target_point.y,
+                         tags = ('connecting',),
+                         width = LINE_WIDTH )
+            
+            self.create_oval(origin.x - radius,
+                             origin.y - radius,
+                             origin.x + radius,
+                             origin.y + radius,
+                             tags = ('connecting',),
+                             width = LINE_WIDTH)
+        else:
+            arrow = Tkinter.BOTH if self._connecting_double else Tkinter.LAST
+            
+            self.create_line(place_point.x,
+                     place_point.y,
+                     target_point.x,
+                     target_point.y,
+                     tags = ('connecting',),
+                     width = LINE_WIDTH,
+                     arrow= arrow,
+                     arrowshape = (10,12,5) )
+    
+    def _connect_transition_to(self):
+        """Menu callback to connect clicked transition to a place."""
+        self._hide_menu()
+        self._state = 'connecting_transition'
+        self.grab_set()
+        self.itemconfig('transition', state = Tkinter.DISABLED)
+        self.itemconfig('place&&!label&&!token', outline = '#FFFF00', width = 5)
+        self._connecting_transition_fn_id = self.bind('<Motion>', self._connecting_transition, '+')
+        transition_id = self._get_transition_id()
+        self._source = self._petri_net.transitions[transition_id]
+    
+    def _connect_transition_to_bidirectional(self):
+        self._connecting_double = True
+        self._connect_transition_to()
+        
+    def _connecting_transition(self, event):
+        """Event callback to draw an arc when connecting a transition."""
+        
+        item = self._get_current_item(event)
+            
+        self.delete('connecting')
+        
+        if item and 'place' in self.gettags(item):
+            place_id = self._get_place_id(item)
+            target = self._petri_net.places[place_id]
+            place_vec = self._source.position - target.position
+            target_point = target.position + place_vec.unit*PLACE_RADIUS*self._current_scale
+        else:
+            target_point = Vec2(event.x, event.y)
+        
+        transition_point = self._find_intersection(self._source, target_point)
+        
+        arrow = Tkinter.BOTH if self._connecting_double else Tkinter.LAST
+        
+        self.create_line(transition_point.x,
+                     transition_point.y,
+                     target_point.x,
+                     target_point.y,
+                     tags = ('connecting',),
+                     width = LINE_WIDTH,
+                     arrow= arrow,
+                     arrowshape = (10,12,5) )
     
     def _undo(self, event):
         
@@ -980,88 +1140,6 @@ class PNEditor(Tkinter.Canvas):
         
         self._set_rename_transition_entry(canvas_id, t)
     
-    def _connect_place_to(self):
-        """Menu callback to connect clicked place to a transition."""
-        self._hide_menu()
-        self._state = 'connecting_place'
-        self.grab_set()
-        self.itemconfig('place', state = Tkinter.DISABLED)
-        self.itemconfig('transition&&!label', outline = '#FFFF00', width = 5)
-        self._connecting_place_fn_id = self.bind('<Motion>', self._connecting_place, '+')
-        place_id = self._get_place_id()
-        self._source = self._petri_net.places[place_id]
-        
-    def _connecting_place(self, event):
-        """Event callback to draw an arc when connecting a place."""
-        
-        item = self._get_current_item(event)
-        self.delete('connecting')
-        
-        if item and 'transition' in self.gettags(item):
-            transition_id = self._get_transition_id(item)
-            target = self._petri_net.transitions[transition_id]
-            place_vec = target.position - self._source.position
-            place_point = self._source.position + place_vec.unit*PLACE_RADIUS*self._current_scale
-            target_point = self._find_intersection(target, self._source.position)
-            self.create_line(place_point.x,
-                         place_point.y,
-                         target_point.x,
-                         target_point.y,
-                         tags = ('connecting',),
-                         width = LINE_WIDTH,
-                         arrow= Tkinter.LAST,
-                         arrowshape = (10,12,5) )
-        else:
-            target_point = Vec2(event.x, event.y)
-            place_vec = target_point - self._source.position
-            place_point = self._source.position + place_vec.unit*PLACE_RADIUS*self._current_scale
-            
-            self.create_line(place_point.x,
-                         place_point.y,
-                         target_point.x,
-                         target_point.y,
-                         tags = ('connecting',),
-                         width = LINE_WIDTH,
-                         arrow= Tkinter.LAST,
-                         arrowshape = (10,12,5) )
-    
-    def _connect_transition_to(self):
-        """Menu callback to connect clicked transition to a place."""
-        self._hide_menu()
-        self._state = 'connecting_transition'
-        self.grab_set()
-        self.itemconfig('transition', state = Tkinter.DISABLED)
-        self.itemconfig('place&&!label&&!token', outline = '#FFFF00', width = 5)
-        self._connecting_transition_fn_id = self.bind('<Motion>', self._connecting_transition, '+')
-        transition_id = self._get_transition_id()
-        self._source = self._petri_net.transitions[transition_id]
-        
-    def _connecting_transition(self, event):
-        """Event callback to draw an arc when connecting a transition."""
-        
-        item = self._get_current_item(event)
-            
-        self.delete('connecting')
-        
-        if item and 'place' in self.gettags(item):
-            place_id = self._get_place_id(item)
-            target = self._petri_net.places[place_id]
-            place_vec = self._source.position - target.position
-            target_point = target.position + place_vec.unit*PLACE_RADIUS*self._current_scale
-        else:
-            target_point = Vec2(event.x, event.y)
-        
-        transition_point = self._find_intersection(self._source, target_point)
-        
-        self.create_line(transition_point.x,
-                     transition_point.y,
-                     target_point.x,
-                     target_point.y,
-                     tags = ('connecting',),
-                     width = LINE_WIDTH,
-                     arrow= Tkinter.LAST,
-                     arrowshape = (10,12,5) )
-    
     def _switch_orientation(self):
         """Menu callback to switch clicked transition's orientation."""
         self._hide_menu()
@@ -1699,7 +1777,7 @@ class PNEditor(Tkinter.Canvas):
             radius = 6
             origin = trgt_point
             
-            side = self._get_intersection_side(t, p)
+            side = self._get_intersection_side(t, p.position)
             if side == 'top':
                 origin.y -= radius
             elif side == 'bottom':
@@ -2000,8 +2078,25 @@ class PNEditor(Tkinter.Canvas):
             if item and 'transition' in self.gettags(item):
                 name = self._get_transition_id(item)
                 target = self._petri_net.transitions[name]
-                self.add_arc(self._source, target)
-                self._add_to_undo(['create_arc', 'Create Arc.', self._source, target])
+                if self._connecting_inhibitor:
+                    weight = 0
+                else:
+                    weight = 1
+                try:
+                    self.add_arc(self._source, target, weight)
+                    self._add_to_undo(['create_arc', 'Create Arc.', self._source, target, weight])
+                except Exception as e:
+                    tkMessageBox.showerror('Cannot create arc', str(e))
+                
+                if self._connecting_double:
+                    try:
+                        self.add_arc(target, self._source, weight)
+                        self._add_to_undo(['create_arc', 'Create Arc.', target, self._source, weight])
+                    except Exception as e:
+                        tkMessageBox.showerror('Cannot create arc', str(e))
+            
+            self._connecting_inhibitor = False
+            self._connecting_double = False
             return
         
         if self._state == 'connecting_transition':
@@ -2019,8 +2114,25 @@ class PNEditor(Tkinter.Canvas):
             if item and 'place' in self.gettags(item):
                 name = self._get_place_id(item)
                 target = self._petri_net.places[name]
-                self.add_arc(self._source, target)
-                self._add_to_undo(['create_arc', 'Create Arc.', self._source, target])
+                if self._connecting_inhibitor:
+                    weight = 0
+                else:
+                    weight = 1
+                try:
+                    self.add_arc(self._source, target)
+                    self._add_to_undo(['create_arc', 'Create Arc.', self._source, target])
+                except Exception as e:
+                    tkMessageBox.showerror('Cannot create arc', str(e))
+                
+                if self._connecting_double:
+                    try:
+                        self.add_arc(target, self._source)
+                        self._add_to_undo(['create_arc', 'Create Arc.', target, self._source])
+                    except Exception as e:
+                        tkMessageBox.showerror('Cannot create arc', str(e))
+            
+            self._connecting_inhibitor = False
+            self._connecting_double = False
             return
         
     
