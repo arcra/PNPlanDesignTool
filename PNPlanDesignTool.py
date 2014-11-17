@@ -3,23 +3,21 @@
 @author: Adrián Revuelta Cuauhtli
 '''
 
-import sys
 import os
-import tkMessageBox
-sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
 import Tkinter as tk
 import ttk
 import tkFileDialog
 import tkFont
+import tkMessageBox
 
 import zipfile
 import tempfile
 
 from petrinets import BasicPetriNet
-from GUI.TabManager import TabManager
-from GUI.PNEditor import PNEditor
-from GUI.AuxDialogs import InputDialog
+from gui.tabmanager import TabManager
+from gui.pneditors import RegularPNEditor
+from gui.auxdialogs import InputDialog
 
 class PNPDT(object):
     
@@ -86,14 +84,14 @@ class PNPDT(object):
         #ysb.grid(row = 0, column = 1, sticky = tk.NS)
         xsb.grid(row = 1, column = 0, sticky = tk.EW)
         
-        self.folder_img = tk.PhotoImage('folder_img', file = os.path.join(os.path.dirname(__file__), 'GUI', 'img', 'TreeView_Folder.gif'))
-        self.petri_net_img = tk.PhotoImage('petri_net_img', file = os.path.join(os.path.dirname(__file__), 'GUI', 'img', 'doc.gif'))
+        self.folder_img = tk.PhotoImage('folder_img', file = os.path.join(os.path.dirname(__file__), 'gui', 'img', 'TreeView_Folder.gif'))
+        self.petri_net_img = tk.PhotoImage('petri_net_img', file = os.path.join(os.path.dirname(__file__), 'gui', 'img', 'doc.gif'))
         self.project_tree.tag_configure('folder', image = self.folder_img)
         self.project_tree.tag_configure('petri_net', image = self.petri_net_img)
         
         
-        self.project_tree.insert('', 'end', 'Primitive_Actions/', text = 'Primitive Actions/', tags = ['folder', 'primitive_action', 'top_level'], open = True)
-        self.project_tree.insert('', 'end', 'Non_Primitive_Actions/', text = 'Non-Primitive Actions/', tags = ['folder', 'non_primitive_action', 'top_level'], open = True)
+        self.project_tree.insert('', 'end', 'Primitive_Actions/', text = 'Primitive Actions', tags = ['folder', 'primitive_action', 'top_level'], open = True)
+        self.project_tree.insert('', 'end', 'Non_Primitive_Actions/', text = 'Non-Primitive Actions', tags = ['folder', 'non_primitive_action', 'top_level'], open = True)
         
         self.tab_manager = TabManager(workspace_frame,
                                      width = PNPDT.WORKSPACE_WIDTH,
@@ -119,9 +117,12 @@ class PNPDT(object):
         self.petri_nets = {}
         self.file_path = None
         
+        self.task_type_folder_menu = tk.Menu(self.root, tearoff = 0)
+        self.task_type_folder_menu.add_command(label = 'Add Task', command = self.create_task)
+        self.task_type_folder_menu.add_command(label = 'Import Task', command = self.import_task)
+        
         self.task_folder_menu = tk.Menu(self.root, tearoff = 0)
-        self.task_folder_menu.add_command(label = 'Add Task', command = self.create_task)
-        self.task_folder_menu.add_command(label = 'Import Task', command = self.import_task)
+        self.task_folder_menu.add_command(label = 'Rename', command = self.rename_task)
         
         self.subfolder_menu = tk.Menu(self.root, tearoff = 0)
         self.subfolder_menu.add_command(label = 'Add Rule', command = self.create_petri_net)
@@ -135,11 +136,18 @@ class PNPDT(object):
         
         #MAC OS:
         if (self.root.tk.call('tk', 'windowingsystem')=='aqua'):
-            self.project_tree.tag_bind('top_level', '<2>', self.popup_task_folder_menu)
-            self.project_tree.tag_bind('top_level', '<Control-1>', self.popup_task_folder_menu)
+            self.project_tree.tag_bind('top_level', '<2>', self.popup_task_type_folder_menu)
+            self.project_tree.tag_bind('top_level', '<Control-1>', self.popup_task_type_folder_menu)
         #Windows / UNIX / Linux:
         else:
-            self.project_tree.tag_bind('top_level', '<3>', self.popup_task_folder_menu)
+            self.project_tree.tag_bind('top_level', '<3>', self.popup_task_type_folder_menu)
+        
+        if (self.root.tk.call('tk', 'windowingsystem')=='aqua'):
+            self.project_tree.tag_bind('task', '<2>', self.popup_task_folder_menu)
+            self.project_tree.tag_bind('task', '<Control-1>', self.popup_task_folder_menu)
+        #Windows / UNIX / Linux:
+        else:
+            self.project_tree.tag_bind('task', '<3>', self.popup_task_folder_menu)
         
         #MAC OS:
         if (self.root.tk.call('tk', 'windowingsystem')=='aqua'):
@@ -178,6 +186,11 @@ class PNPDT(object):
         pne = self.tab_manager.widget_dict[tab_id]
         self.status_label.configure(textvariable = pne.status_var)
         pne.focus_set()
+    
+    def popup_task_type_folder_menu(self, event):
+        self.clicked_element = self.project_tree.identify('item', event.x, event.y)
+        self.popped_up_menu = self.task_type_folder_menu
+        self.task_type_folder_menu.post(event.x_root, event.y_root)
     
     def popup_task_folder_menu(self, event):
         self.clicked_element = self.project_tree.identify('item', event.x, event.y)
@@ -218,20 +231,18 @@ class PNPDT(object):
             count += 1
         return count
     
-    def _add_pne(self, item_id, **kwargs):
+    def _add_pne(self, item_id, PNEditorClass = RegularPNEditor, **kwargs):
         
         open_tab = kwargs.pop('open_tab', True)
-        pn = kwargs.pop('pn_object', None)
+        pne = kwargs.pop('pne_object', None)
         pn_name = kwargs.pop('pn_name', None)
         task = kwargs.pop('task', None)
         
-        if not ((pn_name and task) or pn):
+        if not ((pn_name and task) or pne):
             raise Exception('Either a PetriNet object or a name and a task name must be passed to the Petri Net Editor.') 
         
-        if pn:
-            pne = PNEditor(self.tab_manager, PetriNet = pn)
-        else:
-            pne = PNEditor(self.tab_manager, name = pn_name, task = task)
+        if not pne:
+            pne = PNEditorClass(self.tab_manager, name = pn_name, task = task)
         self.petri_nets[item_id] = pne
         if open_tab:
             self.tab_manager.add(pne, text = pne.name)
@@ -251,7 +262,7 @@ class PNPDT(object):
                 return
             name = dialog.input_var.get()
         
-        item_id = self.clicked_element + name
+        item_id = self.clicked_element + name + '/'
         
         try:
             item_tags = ['task', 'folder', 'task_' + name]
@@ -265,52 +276,57 @@ class PNPDT(object):
             sub_tags = item_tags + ['subfolder']
             sub_tags.remove('task')
             
-            sub_name = 'Executing rules/' if is_primitive_action else 'Decomposing rules/'
+            sub_name = 'Executing rules' if is_primitive_action else 'Decomposing rules'
             sub_id = item_id + ('Executing_rules/' if is_primitive_action else 'Decomposing_Rules/')
             self.project_tree.insert(item_id, 'end', sub_id, text = sub_name, tags = sub_tags + ['dexec'])
             self._adjust_width(sub_name, sub_id)
             
-            sub_name = 'Finalizing rules/'
+            sub_name = 'Finalizing rules'
             sub_id = item_id + 'Finalizing_rules/'
             self.project_tree.insert(item_id, 'end', sub_id, text = sub_name, tags = sub_tags + ['Finalizing'])
             self._adjust_width(sub_name, sub_id)
             
-            sub_name = 'Canceling rules/'
+            sub_name = 'Canceling rules'
             sub_id = item_id + 'Canceling_rules/'
             self.project_tree.insert(item_id, 'end', sub_id, text = sub_name, tags = sub_tags + ['canceling'])
             self._adjust_width(sub_name, sub_id)
             
         except Exception as e:
             tkMessageBox.showerror('ERROR', 'A Task could not be inserted in the selected node, possible duplicate name.\n\n' + str(e))
-            return
+            return None
+        
+        return item_id
     
-    def create_petri_net(self):
-        dialog = InputDialog('Rule name',
-                             'Please input a rule name, preferably composed only of alphabetic characters, dashes and underscores.',
-                             'Name',
-                             entry_length = 25)
-        dialog.window.transient(self.root)
-        self.root.wait_window(dialog.window)
-        if not dialog.value_set:
-            return
-        name = dialog.input_var.get()
+    def create_petri_net(self, pne_object = None):
+        
+        if pne_object:
+            name = pne_object.name
+        else:
+            dialog = InputDialog('Rule name',
+                                 'Please input a rule name, preferably composed only of alphabetic characters, dashes and underscores.',
+                                 'Name',
+                                 entry_length = 25)
+            dialog.window.transient(self.root)
+            self.root.wait_window(dialog.window)
+            if not dialog.value_set:
+                return
+            name = dialog.input_var.get()
+            
+            task = None
+            for t in self.project_tree.item(self.clicked_element, "tags"):
+                if t[:5] == 'task_':
+                    task = t[5:]
+                    break
+            
+            if not task:
+                raise Exception('Task tag was not found!')
+            
+        
         item_id = self.clicked_element + name
         
         item_tags = list(self.project_tree.item(self.clicked_element, "tags")) + ['petri_net']
         item_tags.remove('subfolder')
         item_tags.remove('folder')
-        
-        '''
-        if self.project_tree.tag_has('dexec', self.clicked_element):
-            if self.project_tree.tag_has('primitive_action', self.clicked_element):
-                pn_type = PetriNetTypes.PRIMITIVE_TASK
-            else:
-                pn_type = PetriNetTypes.NON_PRIMITIVE_TASK
-        elif self.project_tree.tag_has('finalizing', self.clicked_element):
-            pn_type = PetriNetTypes.FINALIZING
-        elif self.project_tree.tag_has('canceling', self.clicked_element):
-            pn_type = PetriNetTypes.CANCELING
-        '''
         
         try:
             self.project_tree.insert(self.clicked_element, 'end', item_id, text = name, tags = item_tags)
@@ -319,16 +335,42 @@ class PNPDT(object):
             tkMessageBox.showerror('ERROR', 'The Petri Net could not be inserted in the selected node, possible duplicate name.\n\n' + str(e))
             return
         
-        task = None
-        for t in self.project_tree.item(self.clicked_element, "tags"):
-            if t[:5] == 'task_':
-                task = t[5:]
-                break
+        if pne_object:
+            self._add_pne(item_id, pne_object = pne_object, open_tab = False)
+        else:
+            self._add_pne(item_id, pn_name = name, task = task)
+    
+    def rename_task(self):
         
-        if not task:
-            raise Exception('Task tag was not found!')
+        dialog = InputDialog('Task name',
+                                 'Please input a Task name, preferably composed only of alphanumeric characters.',
+                                 'Name',
+                                 entry_length = 25)
+        dialog.window.transient(self.root)
+        self.root.wait_window(dialog.window)
+        if not dialog.value_set:
+            return
         
-        self._add_pne(item_id, pn_name = name, task = task)
+        name = dialog.input_var.get()
+        
+        old_id = self.clicked_element
+        self.clicked_element = self.project_tree.parent(self.clicked_element)
+        
+        item_id = self.create_task(name)
+        if not item_id:
+            return
+        
+        self.project_tree.detach(old_id)
+        
+        for subfolder in self.project_tree.get_children(old_id):
+            sub_id = subfolder[subfolder[:-1].rfind('/') + 1:]
+            self.clicked_element = item_id + sub_id
+            for pn_id in self.project_tree.get_children(old_id + sub_id):
+                pne = self.delete_petri_net(pn_id)
+                self.create_petri_net(pne)
+        
+        #DO ALL
+        self.project_tree.delete(old_id)
     
     def open_callback(self, event):
         self.clicked_element = self.project_tree.identify('item', event.x, event.y)
@@ -475,6 +517,7 @@ class PNPDT(object):
         except:
             pass
         self.project_tree.delete(item)
+        return pne
     
     def export_to_PNML(self):
         filename = tkFileDialog.asksaveasfilename(

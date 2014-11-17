@@ -11,7 +11,7 @@ import lxml.etree as ET
 
 from nodes import Place, Transition, PreconditionsTransition, _Arc, _get_treeElement,\
     RuleTransition
-from utils.Vector import Vec2
+from utils import Vec2
 
 class BasicPetriNet(object):
     
@@ -180,13 +180,11 @@ class BasicPetriNet(object):
         _treeElement is an internal field for maintaining a reference to the tree element when read from a pnml file.
         """
         
-        try:
-            source._can_connect_to(target, weight)
-        except AttributeError:
-            raise Exception('Arcs should go either from a place to a transition or vice versa and they should exist in the PN.')
+        # Assert:
+        source.can_connect_to(target, weight)
         
         if repr(target) in source._outgoing_arcs:
-            return
+            return None
         
         arc = _Arc(source, target, weight, _treeElement)
         

@@ -12,11 +12,10 @@ from copy import deepcopy
 from petrinets import BasicPetriNet
 from nodes import Place, Transition, TRANSITION_CLASSES, PLACE_CLASSES
 from settings import *
-from utils.Vector import Vec2
-from AuxDialogs import PositiveIntDialog, NonNegativeFloatDialog
+from utils import Vec2
+from auxdialogs import PositiveIntDialog, NonNegativeFloatDialog, NonNegativeIntDialog
 
-class PNEditor(Tkinter.Canvas):
-    
+class BasicPNEditor(Tkinter.Canvas):
     """
     Tk widget for editing Petri Net diagrams.
     
@@ -36,13 +35,14 @@ class PNEditor(Tkinter.Canvas):
     
     def __init__(self, parent, *args, **kwargs):
         """
-        PNEditor constructor.
+        BasePNEditor constructor.
         
         Besides the usual Canvas parameters, it should receive at least either
-        a Petri Net object or a name for the new Petri Net to be created.
+        a Petri Net object or a name for the new Petri Net to be created
+        and a task name.
         
         Keyword Arguments:
-        PetriNet -- Petri Net object to load for viewing/editing.
+        PetriNet -- BasicPetriNet object to load for viewing/editing.
         name -- In case no Petri Net object is specified, a name must be
                 specified for the new Petri Net to be created.
         task -- In case no Petri Net object is specified, a task name must be
@@ -71,52 +71,11 @@ class PNEditor(Tkinter.Canvas):
         
         self._canvas_menu = Tkinter.Menu(self, tearoff = 0)
         
-        '''
-        if petri_net_type != PetriNetTypes.NON_PRIMITIVE_TASK:
-            self._canvas_menu.add_command(label = 'Add Fact Place', command = self._create_unordered_fact_place)
-            self._canvas_menu.add_command(label = 'Add Structured Fact Place', command = self._create_structured_fact_place)
-            self._canvas_menu.add_command(label = 'Add Command Place', command = self._create_command_place)
-            self._canvas_menu.add_command(label = 'Add Primitive Task Place', command = self._create_primitve_task_place)
-            self._canvas_menu.add_command(label = 'Add Non-Primitive Task Place', command = self._create_non_primitve_task_place)
+        self._configure_menus()
         
-        if petri_net_type == PetriNetTypes.PRIMITIVE_TASK:
-            self._canvas_menu.add_separator()
-            self._canvas_menu.add_command(label = 'Add Failure Place', command = self._create_failure_place)
-            self._canvas_menu.add_command(label = 'Add Success Place', command = self._create_success_place)
-        '''
-        
-        self._canvas_menu.add_command(label = 'Add Place', command = self._create_regular_place)
-        self._canvas_menu.add_command(label = 'Add Transition', command = self._create_regular_transition)
         self._canvas_menu.add_separator()
         self._canvas_menu.add_command(label = 'Toggle grid', command = self._toggle_grid)
-        self._canvas_menu.add_command(label = "Toggle transition's tags", command = self._toggle_transitions_tags)
-        
-        self._place_menu = Tkinter.Menu(self, tearoff = 0)
-        self._place_menu.add_command(label = 'Rename Place', command = self._rename_place)
-        self._place_menu.add_command(label = 'Set Initial Marking', command = self._set_initial_marking)
-        self._place_menu.add_command(label = 'Set Capacity', command = self._set_capacity)
-        self._place_menu.add_separator()
-        self._place_menu.add_command(label = 'Remove Place', command = self._remove_place)
-        self._place_menu.add_separator()
-        self._place_menu.add_command(label = 'Connect to...', command = self._connect_place_to, accelerator="(Double click)")
-        self._place_menu.add_command(label = 'Connect to... (bidirectional)', command = self._connect_place_to_bidirectional, accelerator="(Shift+Double click)")
-        self._place_menu.add_command(label = 'Connect to...(inhibitor)', command = self._connect_place_to_inhibitor, accelerator="(Control+Double click)")
-        
-        self._transition_menu = Tkinter.Menu(self, tearoff = 0)
-        self._transition_menu.add_command(label = 'Rename Transition', command = self._rename_transition)
-        self._transition_menu.add_command(label = 'Switch orientation', command = self._switch_orientation)
-        self._transition_menu.add_command(label = 'Set Rate', command = self._set_rate)
-        self._transition_menu.add_command(label = 'Set Priority', command = self._set_priority)
-        self._transition_menu.add_separator()
-        self._transition_menu.add_command(label = 'Remove Transition', command = self._remove_transition)
-        self._transition_menu.add_separator()
-        self._transition_menu.add_command(label = 'Connect to...', command = self._connect_transition_to, accelerator="(Double click)")
-        self._transition_menu.add_command(label = 'Connect to...(bidirectional)', command = self._connect_transition_to_bidirectional, accelerator="(Shift+Double click)")
-        
-        self._arc_menu = Tkinter.Menu(self, tearoff = 0)
-        self._arc_menu.add_command(label = 'Set weight', command = self._set_weight)
-        self._arc_menu.add_separator()
-        self._arc_menu.add_command(label = 'Remove arc', command = self._remove_arc)
+        self._canvas_menu.add_command(label = "Toggle transition's labels", command = self._toggle_transitions_labels)
         
         ################
         # INIT VARS
@@ -136,7 +95,7 @@ class PNEditor(Tkinter.Canvas):
         self.status_var = Tkinter.StringVar()
         self.status_var.set('Ready')
         
-        self._current_grid_size = PNEditor._GRID_SIZE
+        self._current_grid_size = self._GRID_SIZE
         
         self.set_petri_net(self._petri_net)
         
@@ -174,9 +133,8 @@ class PNEditor(Tkinter.Canvas):
             self.bind('<3>', self._popup_menu)
         
         self.bind('<Double-1>', self._set_connecting)
-        self.bind('<Shift-Double-1>', self._set_connecting_double)
-        self.bind('<Control-Double-1>', self._set_connecting_inhibitor)
         #self.bind('<Double-1>', self._test)
+        self.bind('<Shift-Double-1>', self._set_connecting_double)
     
     '''
     def _test(self, event):
@@ -184,11 +142,57 @@ class PNEditor(Tkinter.Canvas):
         print [item] + list(self.gettags(item))
     '''
     
+    def _configure_menus(self):
+        
+        '''
+        if petri_net_type != PetriNetTypes.NON_PRIMITIVE_TASK:
+            self._canvas_menu.add_command(label = 'Add Fact Place', command = self._create_unordered_fact_place)
+            self._canvas_menu.add_command(label = 'Add Structured Fact Place', command = self._create_structured_fact_place)
+            self._canvas_menu.add_command(label = 'Add Command Place', command = self._create_command_place)
+            self._canvas_menu.add_command(label = 'Add Primitive Task Place', command = self._create_primitve_task_place)
+            self._canvas_menu.add_command(label = 'Add Non-Primitive Task Place', command = self._create_non_primitve_task_place)
+        
+        if petri_net_type == PetriNetTypes.PRIMITIVE_TASK:
+            self._canvas_menu.add_separator()
+            self._canvas_menu.add_command(label = 'Add Failure Place', command = self._create_failure_place)
+            self._canvas_menu.add_command(label = 'Add Success Place', command = self._create_success_place)
+        '''
+        
+        self._canvas_menu.add_command(label = 'Add Place', command = self._create_regular_place)
+        self._canvas_menu.add_command(label = 'Add Transition', command = self._create_regular_transition)
+        
+        self._place_menu = Tkinter.Menu(self, tearoff = 0)
+        self._place_menu.add_command(label = 'Rename Place', command = self._rename_place)
+        self._place_menu.add_command(label = 'Set Initial Marking', command = self._set_initial_marking)
+        self._place_menu.add_command(label = 'Set Capacity', command = self._set_capacity)
+        self._place_menu.add_separator()
+        self._place_menu.add_command(label = 'Remove Place', command = self._remove_place)
+        self._place_menu.add_separator()
+        self._place_menu.add_command(label = 'Connect to...', command = self._connect_place_to, accelerator="(Double click)")
+        self._place_menu.add_command(label = 'Connect to... (bidirectional)', command = self._connect_place_to_bidirectional, accelerator="(Shift+Double click)")
+        #self._place_menu.add_command(label = 'Connect to...(inhibitor)', command = self._connect_place_to_inhibitor, accelerator="(Control+Double click)")
+        
+        self._transition_menu = Tkinter.Menu(self, tearoff = 0)
+        self._transition_menu.add_command(label = 'Rename Transition', command = self._rename_transition)
+        self._transition_menu.add_command(label = 'Switch orientation', command = self._switch_orientation)
+        self._transition_menu.add_command(label = 'Set Rate', command = self._set_rate)
+        self._transition_menu.add_command(label = 'Set Priority', command = self._set_priority)
+        self._transition_menu.add_separator()
+        self._transition_menu.add_command(label = 'Remove Transition', command = self._remove_transition)
+        self._transition_menu.add_separator()
+        self._transition_menu.add_command(label = 'Connect to...', command = self._connect_transition_to, accelerator="(Double click)")
+        #self._transition_menu.add_command(label = 'Connect to...(bidirectional)', command = self._connect_transition_to_bidirectional, accelerator="(Shift+Double click)")
+        
+        self._arc_menu = Tkinter.Menu(self, tearoff = 0)
+        self._arc_menu.add_command(label = 'Set weight', command = self._set_weight)
+        self._arc_menu.add_separator()
+        self._arc_menu.add_command(label = 'Remove arc', command = self._remove_arc)
+    
     def _toggle_grid(self):
         self._grid = not self._grid
         self._draw_petri_net()
     
-    def _toggle_transitions_tags(self):
+    def _toggle_transitions_labels(self):
         self._label_transitions = not self._label_transitions
         self._draw_petri_net() 
     
@@ -218,24 +222,6 @@ class PNEditor(Tkinter.Canvas):
         
         self._connecting_double = True
         self._set_connecting(event)
-    
-    def _set_connecting_inhibitor(self, event):
-        
-        self.focus_set()
-        
-        if self._state != 'normal':
-            return
-        
-        item = self._get_current_item(event)
-        
-        self._last_point = Vec2(event.x, event.y)
-        self._last_clicked_id = item
-        
-        if item:
-            tags = self.gettags(item)
-            if 'place' in tags:
-                self._connecting_inhibitor = True
-                self._connect_place_to()
     
     def _connect_place_to(self):
         """Menu callback to connect clicked place to a transition."""
@@ -681,13 +667,13 @@ class PNEditor(Tkinter.Canvas):
     def disable(self):
         self._state = 'disabled'
         self.config(background = 'gray')
-        PNEditor.SMALL_GRID_COLOR = '#DDDDDD'
-        PNEditor.BIG_GRID_COLOR = '#FFFFFF'
+        self.SMALL_GRID_COLOR = '#DDDDDD'
+        self.BIG_GRID_COLOR = '#FFFFFF'
     
     def enable(self):
         self._state = 'normal'
-        PNEditor.SMALL_GRID_COLOR = '#BBBBFF'
-        PNEditor.BIG_GRID_COLOR = '#7777FF'
+        self.SMALL_GRID_COLOR = '#BBBBFF'
+        self.BIG_GRID_COLOR = '#7777FF'
     
     def set_petri_net(self, newPN):
         """Loads a new Petri Net object to be viewed/edited."""
@@ -888,22 +874,22 @@ class PNEditor(Tkinter.Canvas):
             height = self.winfo_reqheight()
         
         startx = int(self._grid_offset.x - self._current_grid_size * self._current_scale)
-        step = int(self._current_grid_size * self._current_scale / PNEditor._GRID_SIZE_FACTOR)
+        step = int(self._current_grid_size * self._current_scale / self._GRID_SIZE_FACTOR)
         
         for x in xrange(startx, width, step):
-            self.create_line(x, 0, x, height, fill = PNEditor.SMALL_GRID_COLOR, tags='grid')
+            self.create_line(x, 0, x, height, fill = self.SMALL_GRID_COLOR, tags='grid')
         
         starty = int(self._grid_offset.y - self._current_grid_size * self._current_scale)
         for y in xrange(starty, height, step):
-            self.create_line(0, y, width, y, fill = PNEditor.SMALL_GRID_COLOR, tags='grid')
+            self.create_line(0, y, width, y, fill = self.SMALL_GRID_COLOR, tags='grid')
         
-        step *= PNEditor._GRID_SIZE_FACTOR
+        step *= self._GRID_SIZE_FACTOR
         
         for x in xrange(startx, width, step):
-            self.create_line(x, 0, x, height, fill = PNEditor.BIG_GRID_COLOR, width = 1.4, tags='grid')
+            self.create_line(x, 0, x, height, fill = self.BIG_GRID_COLOR, width = 1.4, tags='grid')
         
         for y in xrange(starty, height, step):
-            self.create_line(0, y, width, y, fill = PNEditor.BIG_GRID_COLOR, width = 1.4, tags='grid')
+            self.create_line(0, y, width, y, fill = self.BIG_GRID_COLOR, width = 1.4, tags='grid')
         
         self.tag_lower('grid')
     
@@ -911,12 +897,12 @@ class PNEditor(Tkinter.Canvas):
         """Adjusts the grid offset caused by panning the workspace."""
         
         #current_grid_size is smaller than the small grid
-        while self._current_grid_size * self._current_scale < PNEditor._GRID_SIZE / PNEditor._GRID_SIZE_FACTOR + 1:
-            self._current_grid_size *= PNEditor._GRID_SIZE_FACTOR
+        while self._current_grid_size * self._current_scale < self._GRID_SIZE / self._GRID_SIZE_FACTOR + 1:
+            self._current_grid_size *= self._GRID_SIZE_FACTOR
         
         #small grid size is bigger than the current_grid_size
-        while self._current_grid_size * self._current_scale >= PNEditor._GRID_SIZE * PNEditor._GRID_SIZE_FACTOR - 1:
-            self._current_grid_size /= PNEditor._GRID_SIZE_FACTOR
+        while self._current_grid_size * self._current_scale >= self._GRID_SIZE * self._GRID_SIZE_FACTOR - 1:
+            self._current_grid_size /= self._GRID_SIZE_FACTOR
         
         currentGridSize = int(self._current_grid_size * self._current_scale)
         
@@ -1238,7 +1224,7 @@ class PNEditor(Tkinter.Canvas):
         if not source_name or not target_name:
             raise Exception('No source and target specified!')
         
-        if source_name in self._petri_net.places:
+        if 'place_' + source_name in tags:
             arc = self._petri_net.places[source_name]._outgoing_arcs[target_name] 
         else:
             arc = self._petri_net.places[target_name]._incoming_arcs[source_name]
@@ -1256,7 +1242,7 @@ class PNEditor(Tkinter.Canvas):
         """Callback factory function for the marking entry widget."""
         def txtboxCallback(event):
             txt = txtbox.get()
-            if not PNEditor._MARKING_REGEX.match(txt):
+            if not self._MARKING_REGEX.match(txt):
                 msg = ('Please input a positive integer number for the marking.')
                 tkMessageBox.showerror('Invalid Marking', msg)
                 return
@@ -1287,46 +1273,46 @@ class PNEditor(Tkinter.Canvas):
             return
         tags = ('token', tag) + self.gettags(canvas_id)
         if p.init_marking == 1:
-            self.create_oval(p.position.x - PNEditor._TOKEN_RADIUS,
-                             p.position.y - PNEditor._TOKEN_RADIUS,
-                             p.position.x + PNEditor._TOKEN_RADIUS,
-                             p.position.y + PNEditor._TOKEN_RADIUS,
+            self.create_oval(p.position.x - self._TOKEN_RADIUS,
+                             p.position.y - self._TOKEN_RADIUS,
+                             p.position.x + self._TOKEN_RADIUS,
+                             p.position.y + self._TOKEN_RADIUS,
                              tags = tags,
                              fill = 'black' )
             self.scale(tag, p.position.x, p.position.y, self._current_scale, self._current_scale)
             return
         if p.init_marking == 2:
-            self.create_oval(p.position.x - 3*PNEditor._TOKEN_RADIUS,
-                             p.position.y - PNEditor._TOKEN_RADIUS,
-                             p.position.x - PNEditor._TOKEN_RADIUS,
-                             p.position.y + PNEditor._TOKEN_RADIUS,
+            self.create_oval(p.position.x - 3*self._TOKEN_RADIUS,
+                             p.position.y - self._TOKEN_RADIUS,
+                             p.position.x - self._TOKEN_RADIUS,
+                             p.position.y + self._TOKEN_RADIUS,
                              tags = tags,
                              fill = 'black' )
-            self.create_oval(p.position.x + PNEditor._TOKEN_RADIUS,
-                             p.position.y - PNEditor._TOKEN_RADIUS,
-                             p.position.x + 3*PNEditor._TOKEN_RADIUS,
-                             p.position.y + PNEditor._TOKEN_RADIUS,
+            self.create_oval(p.position.x + self._TOKEN_RADIUS,
+                             p.position.y - self._TOKEN_RADIUS,
+                             p.position.x + 3*self._TOKEN_RADIUS,
+                             p.position.y + self._TOKEN_RADIUS,
                              tags = tags,
                              fill = 'black' )
             self.scale(tag, p.position.x, p.position.y, self._current_scale, self._current_scale)
             return
         if p.init_marking == 3:
-            self.create_oval(p.position.x + PNEditor._TOKEN_RADIUS,
-                             p.position.y + PNEditor._TOKEN_RADIUS,
-                             p.position.x + 3*PNEditor._TOKEN_RADIUS,
-                             p.position.y + 3*PNEditor._TOKEN_RADIUS,
+            self.create_oval(p.position.x + self._TOKEN_RADIUS,
+                             p.position.y + self._TOKEN_RADIUS,
+                             p.position.x + 3*self._TOKEN_RADIUS,
+                             p.position.y + 3*self._TOKEN_RADIUS,
                              tags = tags,
                              fill = 'black' )
-            self.create_oval(p.position.x - 3*PNEditor._TOKEN_RADIUS,
-                             p.position.y + PNEditor._TOKEN_RADIUS,
-                             p.position.x - PNEditor._TOKEN_RADIUS,
-                             p.position.y + 3*PNEditor._TOKEN_RADIUS,
+            self.create_oval(p.position.x - 3*self._TOKEN_RADIUS,
+                             p.position.y + self._TOKEN_RADIUS,
+                             p.position.x - self._TOKEN_RADIUS,
+                             p.position.y + 3*self._TOKEN_RADIUS,
                              tags = tags,
                              fill = 'black' )
-            self.create_oval(p.position.x - PNEditor._TOKEN_RADIUS,
-                             p.position.y - 3*PNEditor._TOKEN_RADIUS,
-                             p.position.x + PNEditor._TOKEN_RADIUS,
-                             p.position.y - PNEditor._TOKEN_RADIUS,
+            self.create_oval(p.position.x - self._TOKEN_RADIUS,
+                             p.position.y - 3*self._TOKEN_RADIUS,
+                             p.position.x + self._TOKEN_RADIUS,
+                             p.position.y - self._TOKEN_RADIUS,
                              tags = tags,
                              fill = 'black' )
             self.scale(tag, p.position.x, p.position.y, self._current_scale, self._current_scale)
@@ -2209,3 +2195,96 @@ class PNEditor(Tkinter.Canvas):
         
         if self._anchor_tag != 'all' and (abs(self._moved_vec.x) > 2.0 or abs(self._moved_vec.y) > 2.0) :
             self._add_to_undo(['move_node', 'Move.', self._anchor_node, Vec2(self._moved_vec), self._current_scale])
+
+class RegularPNEditor(BasicPNEditor):
+    
+    def __init__(self, parent, *args, **kwargs):
+        
+        BasicPNEditor.__init__(self, parent, *args, **kwargs)
+        
+    def _configure_menus(self):
+        
+        self._canvas_menu.add_command(label = 'Add Place', command = self._create_regular_place)
+        self._canvas_menu.add_command(label = 'Add Transition', command = self._create_regular_transition)
+        
+        self._place_menu = Tkinter.Menu(self, tearoff = 0)
+        self._place_menu.add_command(label = 'Rename Place', command = self._rename_place)
+        self._place_menu.add_command(label = 'Set Initial Marking', command = self._set_initial_marking)
+        self._place_menu.add_command(label = 'Set Capacity', command = self._set_capacity)
+        self._place_menu.add_separator()
+        self._place_menu.add_command(label = 'Remove Place', command = self._remove_place)
+        self._place_menu.add_separator()
+        self._place_menu.add_command(label = 'Connect to...', command = self._connect_place_to, accelerator="(Double click)")
+        self._place_menu.add_command(label = 'Connect to... (bidirectional)', command = self._connect_place_to_bidirectional, accelerator="(Shift+Double click)")
+        #self._place_menu.add_command(label = 'Connect to...(inhibitor)', command = self._connect_place_to_inhibitor, accelerator="(Control+Double click)")
+        
+        self._transition_menu = Tkinter.Menu(self, tearoff = 0)
+        self._transition_menu.add_command(label = 'Rename Transition', command = self._rename_transition)
+        self._transition_menu.add_command(label = 'Switch orientation', command = self._switch_orientation)
+        self._transition_menu.add_command(label = 'Set Rate', command = self._set_rate)
+        self._transition_menu.add_command(label = 'Set Priority', command = self._set_priority)
+        self._transition_menu.add_separator()
+        self._transition_menu.add_command(label = 'Remove Transition', command = self._remove_transition)
+        self._transition_menu.add_separator()
+        self._transition_menu.add_command(label = 'Connect to...', command = self._connect_transition_to, accelerator="(Double click)")
+        self._transition_menu.add_command(label = 'Connect to...(bidirectional)', command = self._connect_transition_to_bidirectional, accelerator="(Shift+Double click)")
+        
+        self._arc_menu = Tkinter.Menu(self, tearoff = 0)
+        self._arc_menu.add_command(label = 'Set weight', command = self._set_weight)
+        self._arc_menu.add_separator()
+        self._arc_menu.add_command(label = 'Remove arc', command = self._remove_arc)
+        
+        self.bind('<Control-Double-1>', self._set_connecting_inhibitor)
+    
+    def _set_connecting_inhibitor(self, event):
+        
+        self.focus_set()
+        
+        if self._state != 'normal':
+            return
+        
+        item = self._get_current_item(event)
+        
+        self._last_point = Vec2(event.x, event.y)
+        self._last_clicked_id = item
+        
+        if item:
+            tags = self.gettags(item)
+            if 'place' in tags:
+                self._connecting_inhibitor = True
+                self._connect_place_to()
+    
+    def _set_weight(self):
+        """Menu callback to set the weight of an arc."""
+        self._hide_menu()
+        
+        tags = self.gettags(self._last_clicked_id)
+        
+        if 'arc' not in tags:
+            return None
+        
+        source_name = ''
+        target_name = ''
+        
+        for tag in tags:
+            if tag[:7] == 'source_':
+                source_name = tag[7:]
+            elif tag[:7] == 'target_':
+                target_name = tag[7:]
+        
+        if not source_name or not target_name:
+            raise Exception('No source and target specified!')
+        
+        if 'place_' + source_name in tags:
+            arc = self._petri_net.places[source_name]._outgoing_arcs[target_name] 
+        else:
+            arc = self._petri_net.places[target_name]._incoming_arcs[source_name]
+            
+        dialog = NonNegativeIntDialog("Set arc's weight", 'Write a non-negative integer for \nthe weight of arc: ' + str(arc), 'Weight', init_value = arc.weight)
+        dialog.window.transient(self)
+        self.wait_window(dialog.window)
+        if dialog.value_set and arc.weight != int(dialog.input_var.get()):
+            self._add_to_undo(['set_weight', 'Set Arc weight.', arc, arc.weight])
+            arc.weight = int(dialog.input_var.get())
+            self._draw_arc(arc)
+            self.edited = True

@@ -7,7 +7,7 @@ import abc
 import copy
 import lxml.etree as ET
 
-from utils.Vector import Vec2
+from utils import Vec2
 from settings import *
 from settings import __version__, _UPDATE_LABEL_OFFSET
 
@@ -140,10 +140,13 @@ class Place(Node):
         self.capacity = capacity
         self.current_marking = self.init_marking
         
-    def _can_connect_to(self, target, weight):
+    def can_connect_to(self, target, weight):
         
-        if not self.petri_net or self.__repr__() not in self.petri_net.places:
+        if not self.petri_net or repr(self) not in self.petri_net.places or repr(target) not in self.petri_net.transitions:
             raise Exception('Arcs should go either from a place to a transition or vice versa and they should exist in the PN.')
+        
+        if repr(target) in self._outgoing_arcs:
+            raise Exception('There already exists an arc between these nodes.')
     
     @classmethod
     def fromETreeElement(cls, element):
@@ -287,8 +290,8 @@ class NonPrimitiveTaskPlace(Place):
     def __init__(self, name, position=Vec2(), init_marking=0, capacity=1):
         super(NonPrimitiveTaskPlace, self).__init__(name, position=position, init_marking=init_marking, capacity=capacity)
     
-    def _can_connect_to(self, target, weight):
-        super(NonPrimitiveTaskPlace, self)._can_connect_to(target, weight)
+    def can_connect_to(self, target, weight):
+        super(NonPrimitiveTaskPlace, self).can_connect_to(target, weight)
         if target.__class__ != SequenceTransition:
             raise Exception('TASK places cannot connect to a transition that is not of type SEQUENCE.')
         
@@ -304,8 +307,8 @@ class PrimitiveTaskPlace(Place):
     def __init__(self, name, position=Vec2(), init_marking=0, capacity=1):
         super(PrimitiveTaskPlace, self).__init__(name, position=position, init_marking=init_marking, capacity=capacity)
     
-    def _can_connect_to(self, target, weight):
-        super(PrimitiveTaskPlace, self)._can_connect_to(target, weight)
+    def can_connect_to(self, target, weight):
+        super(PrimitiveTaskPlace, self).can_connect_to(target, weight)
         if target.__class__ != SequenceTransition:
             raise Exception('TASK places cannot connect to a transition that is not of type SEQUENCE.')
         
@@ -321,8 +324,8 @@ class CommandPlace(Place):
     def __init__(self, name, position=Vec2(), init_marking=0, capacity=1):
         super(CommandPlace, self).__init__(name, position=position, init_marking=init_marking, capacity=capacity)
     
-    def _can_connect_to(self, target, weight):
-        super(CommandPlace, self)._can_connect_to(target, weight)
+    def can_connect_to(self, target, weight):
+        super(CommandPlace, self).can_connect_to(target, weight)
         raise Exception('COMMAND places cannot connect to any transition.')
     
 class FactPlace(Place):
@@ -334,8 +337,8 @@ class FactPlace(Place):
     def __init__(self, name, position=Vec2(), init_marking=0, capacity=1):
         super(FactPlace, self).__init__(name, position=position, init_marking=init_marking, capacity=capacity)
     
-    def _can_connect_to(self, target, weight):
-        super(FactPlace, self)._can_connect_to(target, weight)
+    def can_connect_to(self, target, weight):
+        super(FactPlace, self).can_connect_to(target, weight)
         
         if target.__class__ == SequenceTransition:
             raise Exception('FACT and STRUCTURED_FACT PLACES cannot be connected to SEQUENCE transitions.')
@@ -349,8 +352,8 @@ class StructuredFactPlace(Place):
     def __init__(self, name, position=Vec2(), init_marking=0, capacity=1):
         super(StructuredFactPlace, self).__init__(name, position=position, init_marking=init_marking, capacity=capacity)
     
-    def _can_connect_to(self, target, weight):
-        super(StructuredFactPlace, self)._can_connect_to(target, weight)
+    def can_connect_to(self, target, weight):
+        super(StructuredFactPlace, self).can_connect_to(target, weight)
         
         if target.__class__ == SequenceTransition:
             raise Exception('FACT and STRUCTURED_FACT PLACES cannot be connected to SEQUENCE transitions.')
@@ -364,8 +367,8 @@ class OrPlace(Place):
     def __init__(self, name, position=Vec2(), init_marking=0, capacity=1):
         super(OrPlace, self).__init__(name, position=position, init_marking=init_marking, capacity=capacity)
     
-    def _can_connect_to(self, target, weight):
-        super(OrPlace, self)._can_connect_to(target, weight)
+    def can_connect_to(self, target, weight):
+        super(OrPlace, self).can_connect_to(target, weight)
         
         if target.__class__ == SequenceTransition:
             raise Exception('OR places cannot connect to a SEQUENCE transition.')
@@ -379,8 +382,8 @@ class TaskStatusPlace(Place):
     def __init__(self, name, position=Vec2(), init_marking=0, capacity=1):
         super(TaskStatusPlace, self).__init__(name, position=position, init_marking=init_marking, capacity=capacity)
     
-    def _can_connect_to(self, target, weight):
-        super(TaskStatusPlace, self)._can_connect_to(target, weight)
+    def can_connect_to(self, target, weight):
+        super(TaskStatusPlace, self).can_connect_to(target, weight)
         raise Exception('TASK_STATUS places cannot connect to any transition.')
 
 PLACE_CLASSES = (Place,
@@ -435,12 +438,17 @@ class Transition(Node):
         """Sets the type of the transition. Should be a value from one of the constants in TransitionTypes class."""
         self._type = value
     
-    def _can_connect_to(self, target, weight):
-        if not self.petri_net or self.__repr__() not in self.petri_net.transitions:
+    def can_connect_to(self, target, weight):
+        
+        
+        if not self.petri_net or repr(self) not in self.petri_net.transitions or repr(target) not in self.petri_net.places:
             raise Exception('Arcs should go either from a place to a transition or vice versa and they should exist in the PN.')
         
         if weight < 1:
             raise Exception('Transitions cannot connect to places with inhibitor arcs (weight == 0).')
+        
+        if repr(target) in self._outgoing_arcs:
+            raise Exception('There already exists an arc between these nodes.')
     
     @classmethod
     def fromETreeElement(cls, element):
@@ -621,8 +629,8 @@ class PreconditionsTransition(Transition):
     def __init__(self, name, position = Vec2(), isHorizontal = False, rate = 1.0, priority = 1):
         super(PreconditionsTransition, self).__init__(name, position, isHorizontal, rate, priority)
         
-    def _can_connect_to(self, target, weight):
-        super(PreconditionsTransition, self)._can_connect_to(target, weight)
+    def can_connect_to(self, target, weight):
+        super(PreconditionsTransition, self).can_connect_to(target, weight)
         if target.__class__ in [CommandPlace, OrPlace]:
             raise Exception('PRECONDITIONS transitions cannot connect to a COMMAND or an OR place.')
 
@@ -635,8 +643,8 @@ class RuleTransition(Transition):
     def __init__(self, name, position = Vec2(), isHorizontal = False, rate = 1.0, priority = 1):
         super(RuleTransition, self).__init__(name, position, isHorizontal, rate, priority)
     
-    def _can_connect_to(self, target, weight):
-        super(RuleTransition, self)._can_connect_to(target, weight)
+    def can_connect_to(self, target, weight):
+        super(RuleTransition, self).can_connect_to(target, weight)
         if target.__class__ == OrPlace:
             raise Exception('RULE transitions cannot connect to OR places.')
     
@@ -649,8 +657,8 @@ class AndTransition(Transition):
     def __init__(self, name, position = Vec2(), isHorizontal = False, rate = 1.0, priority = 1):
         super(AndTransition, self).__init__(name, position, isHorizontal, rate, priority)
     
-    def _can_connect_to(self, target, weight):
-        super(AndTransition, self)._can_connect_to(target, weight)
+    def can_connect_to(self, target, weight):
+        super(AndTransition, self).can_connect_to(target, weight)
         if target.__class__ != OrPlace:
             raise Exception('AND transitions cannot connect to a place that is not an OR place.')
 
@@ -663,8 +671,8 @@ class SequenceTransition(Transition):
     def __init__(self, name, position = Vec2(), isHorizontal = False, rate = 1.0, priority = 1):
         super(SequenceTransition, self).__init__(name, position, isHorizontal, rate, priority)
     
-    def _can_connect_to(self, target, weight):
-        super(SequenceTransition, self)._can_connect_to(target, weight)
+    def can_connect_to(self, target, weight):
+        super(SequenceTransition, self).can_connect_to(target, weight)
         if target.__class__ not in [NonPrimitiveTaskPlace, PrimitiveTaskPlace]:
             raise Exception('SEQUENCE transitions cannot connect to places that are not TASK places.')
 
