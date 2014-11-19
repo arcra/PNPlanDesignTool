@@ -61,6 +61,9 @@ class Vec2(object):
     def __neg__(self):
         return Vec2(-self.x, -self.y)
     
+    def isNull(self):
+        return self.x == 0 and self.y == 0
+    
     def __str__(self):
         return '(' + str(self.x) + ', ' + str(self.y) + ')'
     
@@ -70,9 +73,9 @@ class Vec2(object):
     
     @property
     def unit(self):
-        m = self.magnitude
-        if m == 0:
-            raise Exception("Null Vectors don't have unit vector.")
+        if self.isNull():
+            return Vec2()
+            #raise Exception("Null Vectors don't have unit vector.")
         return self/self.magnitude
     
     @property

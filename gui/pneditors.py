@@ -69,13 +69,7 @@ class BasicPNEditor(Tkinter.Canvas):
                 raise Exception('The PetriNet name cannot be an empty string.')
             self._petri_net = BasicPetriNet(petri_net_name, task)
         
-        self._canvas_menu = Tkinter.Menu(self, tearoff = 0)
-        
-        self._configure_menus()
-        
-        self._canvas_menu.add_separator()
-        self._canvas_menu.add_command(label = 'Toggle grid', command = self._toggle_grid)
-        self._canvas_menu.add_command(label = "Toggle transition's labels", command = self._toggle_transitions_labels)
+        self._create_menus()
         
         ################
         # INIT VARS
@@ -142,51 +136,84 @@ class BasicPNEditor(Tkinter.Canvas):
         print [item] + list(self.gettags(item))
     '''
     
+    def _create_menus(self):
+        
+        self._menus_options_sets_dict = {
+                                       'canvas' : [
+                                                   ('Add Place', self._create_regular_place),
+                                                   ('Add Transition', self._create_regular_place)
+                                                ],
+                                       'pneditor_widget_options' : [
+                                                                    ('Toggle grid', self._toggle_grid),
+                                                                    ("Toggle transition's labels", self._toggle_transitions_labels)
+                                                                ],
+                                       'place_properties' : [
+                                                          ('Rename Place', self._rename_place),
+                                                          ('Set Initial Marking', self._set_initial_marking),
+                                                          ('Set Capacity', self._set_capacity)
+                                                        ],
+                                       'place_operations' : [
+                                                          ('Remove Place', self._remove_place),
+                                                        ],
+                                       'place_connections' : [
+                                                          ('Connect to...', self._connect_place_to, '(Double click)'),
+                                                          ('Connect to...(bidirectional)', self._connect_place_to_bidirectional, '(Shift+Double click)')
+                                                        ],
+                                       'transition_properties' : [
+                                                               ('Rename Transition', self._rename_transition),
+                                                               ('Switch orientation', self._switch_orientation),
+                                                               ('Set Rate', self._set_rate),
+                                                               ('Set Priority', self._set_priority)
+                                                            ],
+                                       'transition_operations' : [
+                                                               ('Remove Transition', self._remove_transition)
+                                                            ],
+                                       'transition_connections' : [
+                                                               ('Connect to...', self._connect_transition_to, '(Double click)'),
+                                                               ('Connect to...(bidirectional)', self._connect_transition_to_bidirectional, '(Shift+Double click)')
+                                                            ],
+                                       'arc_properties' : [
+                                                        ('Set Weight', self._set_weight)
+                                                    ],
+                                       'arc_operations' : [
+                                                        ('Remove arc', self._remove_arc)
+                                                    ]
+                                }
+        
+        self._configure_menus()
+        self._menus_dict['canvas'].append('pneditor_widget_options')
+        self._build_menus()
+    
     def _configure_menus(self):
         
-        '''
-        if petri_net_type != PetriNetTypes.NON_PRIMITIVE_TASK:
-            self._canvas_menu.add_command(label = 'Add Fact Place', command = self._create_unordered_fact_place)
-            self._canvas_menu.add_command(label = 'Add Structured Fact Place', command = self._create_structured_fact_place)
-            self._canvas_menu.add_command(label = 'Add Command Place', command = self._create_command_place)
-            self._canvas_menu.add_command(label = 'Add Primitive Task Place', command = self._create_primitve_task_place)
-            self._canvas_menu.add_command(label = 'Add Non-Primitive Task Place', command = self._create_non_primitve_task_place)
+        self._menus_dict = {
+                            'canvas' : ['canvas'],
+                            'Place' : ['place_properties', 'place_operations', 'place_connections'],
+                            'Transition' : ['transition_properties', 'transition_operations', 'transition_connections'],
+                            'Arc' : ['arc_properties', 'arc_operations']
+                            }
+    
+    def _build_menus(self):
         
-        if petri_net_type == PetriNetTypes.PRIMITIVE_TASK:
-            self._canvas_menu.add_separator()
-            self._canvas_menu.add_command(label = 'Add Failure Place', command = self._create_failure_place)
-            self._canvas_menu.add_command(label = 'Add Success Place', command = self._create_success_place)
-        '''
-        
-        self._canvas_menu.add_command(label = 'Add Place', command = self._create_regular_place)
-        self._canvas_menu.add_command(label = 'Add Transition', command = self._create_regular_transition)
-        
-        self._place_menu = Tkinter.Menu(self, tearoff = 0)
-        self._place_menu.add_command(label = 'Rename Place', command = self._rename_place)
-        self._place_menu.add_command(label = 'Set Initial Marking', command = self._set_initial_marking)
-        self._place_menu.add_command(label = 'Set Capacity', command = self._set_capacity)
-        self._place_menu.add_separator()
-        self._place_menu.add_command(label = 'Remove Place', command = self._remove_place)
-        self._place_menu.add_separator()
-        self._place_menu.add_command(label = 'Connect to...', command = self._connect_place_to, accelerator="(Double click)")
-        self._place_menu.add_command(label = 'Connect to... (bidirectional)', command = self._connect_place_to_bidirectional, accelerator="(Shift+Double click)")
-        #self._place_menu.add_command(label = 'Connect to...(inhibitor)', command = self._connect_place_to_inhibitor, accelerator="(Control+Double click)")
-        
-        self._transition_menu = Tkinter.Menu(self, tearoff = 0)
-        self._transition_menu.add_command(label = 'Rename Transition', command = self._rename_transition)
-        self._transition_menu.add_command(label = 'Switch orientation', command = self._switch_orientation)
-        self._transition_menu.add_command(label = 'Set Rate', command = self._set_rate)
-        self._transition_menu.add_command(label = 'Set Priority', command = self._set_priority)
-        self._transition_menu.add_separator()
-        self._transition_menu.add_command(label = 'Remove Transition', command = self._remove_transition)
-        self._transition_menu.add_separator()
-        self._transition_menu.add_command(label = 'Connect to...', command = self._connect_transition_to, accelerator="(Double click)")
-        #self._transition_menu.add_command(label = 'Connect to...(bidirectional)', command = self._connect_transition_to_bidirectional, accelerator="(Shift+Double click)")
-        
-        self._arc_menu = Tkinter.Menu(self, tearoff = 0)
-        self._arc_menu.add_command(label = 'Set weight', command = self._set_weight)
-        self._arc_menu.add_separator()
-        self._arc_menu.add_command(label = 'Remove arc', command = self._remove_arc)
+        for menu, components in self._menus_dict.iteritems():
+            if not components:
+                continue
+            current_menu = Tkinter.Menu(self, tearoff = 0)
+            current_component = components[0]
+            for el in self._menus_options_sets_dict[current_component]:
+                if len(el) > 2:
+                    current_menu.add_command(label = el[0], command = el[1], accelerator = el[2])
+                else:
+                    current_menu.add_command(label = el[0], command = el[1])
+            for current_component in components[1:]:
+                current_menu.add_separator()
+                for el in self._menus_options_sets_dict[current_component]:
+                    if len(el) > 2:
+                        current_menu.add_command(label = el[0], command = el[1], accelerator = el[2])
+                    else:
+                        current_menu.add_command(label = el[0], command = el[1])
+            
+            self._menus_dict[menu] = current_menu
     
     def _toggle_grid(self):
         self._grid = not self._grid
@@ -1229,14 +1256,27 @@ class BasicPNEditor(Tkinter.Canvas):
         else:
             arc = self._petri_net.places[target_name]._incoming_arcs[source_name]
             
+        new_weight = self._get_weight(arc)
+        if not new_weight:
+            return
+        try:
+            arc.source.can_connect_to(arc.target, new_weight)
+        except Exception as e:
+            tkMessageBox.showerror('Invalid weight.', str(e))
+            return
+        self._add_to_undo(['set_weight', 'Set Arc weight.', arc, arc.weight])
+        arc.weight = new_weight
+        self._draw_arc(arc)
+        self.edited = True
+    
+    def _get_weight(self, arc):
         dialog = PositiveIntDialog("Set arc's weight", 'Write a positive integer for \nthe weight of arc: ' + str(arc), 'Weight', init_value = arc.weight)
         dialog.window.transient(self)
         self.wait_window(dialog.window)
         if dialog.value_set and arc.weight != int(dialog.input_var.get()):
-            self._add_to_undo(['set_weight', 'Set Arc weight.', arc, arc.weight])
-            arc.weight = int(dialog.input_var.get())
-            self._draw_arc(arc)
-            self.edited = True
+            return int(dialog.input_var.get())
+        return None
+        
     
     def _get_marking_callback(self, txtbox, txtbox_id, canvas_id, p):
         """Callback factory function for the marking entry widget."""
@@ -1958,16 +1998,15 @@ class BasicPNEditor(Tkinter.Canvas):
         item = self._get_current_item(event)
         
         self._last_point = Vec2(event.x, event.y)
-        self._popped_up_menu = self._canvas_menu
+        self._popped_up_menu = self._menus_dict['canvas']
         if item:
             tags = self.gettags(item)
             self._last_clicked_id = item
-            if 'place' in tags:
-                self._popped_up_menu = self._place_menu
-            elif 'transition' in tags:
-                self._popped_up_menu = self._transition_menu
-            elif 'arc' in tags:
-                self._popped_up_menu = self._arc_menu
+            
+            for tag in self._menus_dict:
+                if tag in tags:
+                    self._popped_up_menu = self._menus_dict[tag]
+                    break
         
         self._popped_up_menu.post(event.x_root, event.y_root)
     
@@ -2050,77 +2089,12 @@ class BasicPNEditor(Tkinter.Canvas):
             return
         
         if self._state == 'connecting_place':
-            self._state = 'normal'
-            self.grab_release()
-            self.itemconfig('place', state = Tkinter.NORMAL)
-            
-            for tc in TRANSITION_CLASSES:
-                self.itemconfig('transition&&' + tc.__name__ + '&&!label', outline = tc.OUTLINE_COLOR, width = LINE_WIDTH)
-            
-            self.unbind('<Motion>', self._connecting_place_fn_id)
-            self.delete('connecting')
-            item = self._get_current_item(event)
-        
-            if item and 'transition' in self.gettags(item):
-                name = self._get_transition_id(item)
-                target = self._petri_net.transitions[name]
-                if self._connecting_inhibitor:
-                    weight = 0
-                else:
-                    weight = 1
-                try:
-                    self.add_arc(self._source, target, weight)
-                    self._add_to_undo(['create_arc', 'Create Arc.', self._source, target, weight])
-                except Exception as e:
-                    tkMessageBox.showerror('Cannot create arc', str(e))
-                
-                if self._connecting_double:
-                    try:
-                        self.add_arc(target, self._source, weight)
-                        self._add_to_undo(['create_arc', 'Create Arc.', target, self._source, weight])
-                    except Exception as e:
-                        tkMessageBox.showerror('Cannot create arc', str(e))
-            
-            self._connecting_inhibitor = False
-            self._connecting_double = False
+            self._finish_connect_place(event)
             return
         
         if self._state == 'connecting_transition':
-            self._state = 'normal'
-            self.grab_release()
-            self.itemconfig('transition', state = Tkinter.NORMAL)
-            
-            for pc in PLACE_CLASSES:
-                self.itemconfig('place&&' + pc.__name__ + '&&!label&&!token', outline = pc.OUTLINE_COLOR, width = LINE_WIDTH)
-            
-            self.unbind('<Motion>', self._connecting_transition_fn_id)
-            self.delete('connecting')
-            item = self._get_current_item(event)
-        
-            if item and 'place' in self.gettags(item):
-                name = self._get_place_id(item)
-                target = self._petri_net.places[name]
-                if self._connecting_inhibitor:
-                    weight = 0
-                else:
-                    weight = 1
-                try:
-                    self.add_arc(self._source, target)
-                    self._add_to_undo(['create_arc', 'Create Arc.', self._source, target])
-                except Exception as e:
-                    tkMessageBox.showerror('Cannot create arc', str(e))
-                
-                if self._connecting_double:
-                    try:
-                        self.add_arc(target, self._source)
-                        self._add_to_undo(['create_arc', 'Create Arc.', target, self._source])
-                    except Exception as e:
-                        tkMessageBox.showerror('Cannot create arc', str(e))
-            
-            self._connecting_inhibitor = False
-            self._connecting_double = False
+            self._finish_connect_transition(event)
             return
-        
     
     def _set_anchor(self, event):
         """When in "normal" mode (see _left_click), determines whether a movable element or the
@@ -2153,7 +2127,72 @@ class BasicPNEditor(Tkinter.Canvas):
                     self._anchor_tag = t
                     self._anchor_node = self._petri_net.transitions[t[11:]]
                     break
+    
+    def _finish_connect_place(self, event):
+        self._state = 'normal'
+        self.grab_release()
+        self.itemconfig('place', state = Tkinter.NORMAL)
         
+        for tc in TRANSITION_CLASSES:
+            self.itemconfig('transition&&' + tc.__name__ + '&&!label', outline = tc.OUTLINE_COLOR, width = LINE_WIDTH)
+        
+        self.unbind('<Motion>', self._connecting_place_fn_id)
+        self.delete('connecting')
+        item = self._get_current_item(event)
+    
+        if item and 'transition' in self.gettags(item):
+            name = self._get_transition_id(item)
+            target = self._petri_net.transitions[name]
+            if self._connecting_inhibitor:
+                weight = 0
+            else:
+                weight = 1
+            try:
+                self.add_arc(self._source, target, weight)
+                self._add_to_undo(['create_arc', 'Create Arc.', self._source, target, weight])
+            except Exception as e:
+                tkMessageBox.showerror('Cannot create arc', str(e))
+            
+            if self._connecting_double:
+                try:
+                    self.add_arc(target, self._source, weight)
+                    self._add_to_undo(['create_arc', 'Create Arc.', target, self._source, weight])
+                except Exception as e:
+                    tkMessageBox.showerror('Cannot create arc', str(e))
+        
+        self._connecting_inhibitor = False
+        self._connecting_double = False
+    
+    def _finish_connect_transition(self, event):
+        self._state = 'normal'
+        self.grab_release()
+        self.itemconfig('transition', state = Tkinter.NORMAL)
+        
+        for pc in PLACE_CLASSES:
+            self.itemconfig('place&&' + pc.__name__ + '&&!label&&!token', outline = pc.OUTLINE_COLOR, width = LINE_WIDTH)
+        
+        self.unbind('<Motion>', self._connecting_transition_fn_id)
+        self.delete('connecting')
+        item = self._get_current_item(event)
+    
+        if item and 'place' in self.gettags(item):
+            name = self._get_place_id(item)
+            target = self._petri_net.places[name]
+            try:
+                self.add_arc(self._source, target)
+                self._add_to_undo(['create_arc', 'Create Arc.', self._source, target])
+            except Exception as e:
+                tkMessageBox.showerror('Cannot create arc', str(e))
+            
+            if self._connecting_double:
+                try:
+                    self.add_arc(target, self._source)
+                    self._add_to_undo(['create_arc', 'Create Arc.', target, self._source])
+                except Exception as e:
+                    tkMessageBox.showerror('Cannot create arc', str(e))
+        
+        self._connecting_inhibitor = False
+        self._connecting_double = False
     
     def _dragCallback(self, event):
         """<B1-Motion> callback for moving an element or panning the work area."""
@@ -2164,11 +2203,6 @@ class BasicPNEditor(Tkinter.Canvas):
         
         diff = e - self._last_point
         self.move(self._anchor_tag, diff.x, diff.y)
-        if self._anchor_tag != 'all':
-            self._anchor_node.position += diff
-            self._moved_vec += diff
-            self._draw_item_arcs(self._anchor_node)
-        
         if self._anchor_tag == 'all':
             for p in self._petri_net.places.itervalues():
                 p.position += diff
@@ -2179,6 +2213,10 @@ class BasicPNEditor(Tkinter.Canvas):
             if self._grid:
                 self._grid_offset = (self._grid_offset + diff).int
                 self._draw_grid()
+        else:
+            self._anchor_node.position += diff
+            self._moved_vec += diff
+            self._draw_item_arcs(self._anchor_node)
         
         self.edited = True
         self._last_point = Vec2(event.x, event.y)
@@ -2204,35 +2242,16 @@ class RegularPNEditor(BasicPNEditor):
         
     def _configure_menus(self):
         
-        self._canvas_menu.add_command(label = 'Add Place', command = self._create_regular_place)
-        self._canvas_menu.add_command(label = 'Add Transition', command = self._create_regular_transition)
-        
-        self._place_menu = Tkinter.Menu(self, tearoff = 0)
-        self._place_menu.add_command(label = 'Rename Place', command = self._rename_place)
-        self._place_menu.add_command(label = 'Set Initial Marking', command = self._set_initial_marking)
-        self._place_menu.add_command(label = 'Set Capacity', command = self._set_capacity)
-        self._place_menu.add_separator()
-        self._place_menu.add_command(label = 'Remove Place', command = self._remove_place)
-        self._place_menu.add_separator()
-        self._place_menu.add_command(label = 'Connect to...', command = self._connect_place_to, accelerator="(Double click)")
-        self._place_menu.add_command(label = 'Connect to... (bidirectional)', command = self._connect_place_to_bidirectional, accelerator="(Shift+Double click)")
-        #self._place_menu.add_command(label = 'Connect to...(inhibitor)', command = self._connect_place_to_inhibitor, accelerator="(Control+Double click)")
-        
-        self._transition_menu = Tkinter.Menu(self, tearoff = 0)
-        self._transition_menu.add_command(label = 'Rename Transition', command = self._rename_transition)
-        self._transition_menu.add_command(label = 'Switch orientation', command = self._switch_orientation)
-        self._transition_menu.add_command(label = 'Set Rate', command = self._set_rate)
-        self._transition_menu.add_command(label = 'Set Priority', command = self._set_priority)
-        self._transition_menu.add_separator()
-        self._transition_menu.add_command(label = 'Remove Transition', command = self._remove_transition)
-        self._transition_menu.add_separator()
-        self._transition_menu.add_command(label = 'Connect to...', command = self._connect_transition_to, accelerator="(Double click)")
-        self._transition_menu.add_command(label = 'Connect to...(bidirectional)', command = self._connect_transition_to_bidirectional, accelerator="(Shift+Double click)")
-        
-        self._arc_menu = Tkinter.Menu(self, tearoff = 0)
-        self._arc_menu.add_command(label = 'Set weight', command = self._set_weight)
-        self._arc_menu.add_separator()
-        self._arc_menu.add_command(label = 'Remove arc', command = self._remove_arc)
+        self._menus_options_sets_dict['place_connections'].append(
+                            ('Connect to...(inhibitor)', self._connect_place_to_inhibitor, "(Control+Double click)")
+                        )
+                    
+        self._menus_dict = {
+                            'canvas' : ['canvas'],
+                            'Place' : ['place_properties', 'place_operations', 'place_connections'],
+                            'Transition' : ['transition_properties', 'transition_operations', 'transition_connections'],
+                            'Arc' : ['arc_properties', 'arc_operations']
+                            }
         
         self.bind('<Control-Double-1>', self._set_connecting_inhibitor)
     
@@ -2254,37 +2273,43 @@ class RegularPNEditor(BasicPNEditor):
                 self._connecting_inhibitor = True
                 self._connect_place_to()
     
-    def _set_weight(self):
-        """Menu callback to set the weight of an arc."""
-        self._hide_menu()
-        
-        tags = self.gettags(self._last_clicked_id)
-        
-        if 'arc' not in tags:
-            return None
-        
-        source_name = ''
-        target_name = ''
-        
-        for tag in tags:
-            if tag[:7] == 'source_':
-                source_name = tag[7:]
-            elif tag[:7] == 'target_':
-                target_name = tag[7:]
-        
-        if not source_name or not target_name:
-            raise Exception('No source and target specified!')
-        
-        if 'place_' + source_name in tags:
-            arc = self._petri_net.places[source_name]._outgoing_arcs[target_name] 
-        else:
-            arc = self._petri_net.places[target_name]._incoming_arcs[source_name]
-            
+    def _get_weight(self, arc):
         dialog = NonNegativeIntDialog("Set arc's weight", 'Write a non-negative integer for \nthe weight of arc: ' + str(arc), 'Weight', init_value = arc.weight)
         dialog.window.transient(self)
         self.wait_window(dialog.window)
         if dialog.value_set and arc.weight != int(dialog.input_var.get()):
-            self._add_to_undo(['set_weight', 'Set Arc weight.', arc, arc.weight])
-            arc.weight = int(dialog.input_var.get())
-            self._draw_arc(arc)
-            self.edited = True
+            return int(dialog.input_var.get())
+        return None
+    
+class NonPrimitiveTaskPNEditor(RegularPNEditor):
+    
+    def __init__(self, parent, *args, **kwargs):
+        
+        RegularPNEditor.__init__(self, parent, *args, **kwargs)
+    
+    def _configure_menus(self):
+        
+        RegularPNEditor._configure_menus(self)
+        
+        #override self._menus_options_sets_dict['canvas']
+        
+        #ADD NonPrimitiveTaskPNEditor options
+        
+        
+class PrimitiveTaskPNEditor(BasicPNEditor):
+    
+    def __init__(self, parent, *args, **kwargs):
+        
+        BasicPNEditor.__init__(self, parent, *args, **kwargs)
+
+class FinalizingPNEditor(BasicPNEditor):
+    
+    def __init__(self, parent, *args, **kwargs):
+        
+        BasicPNEditor.__init__(self, parent, *args, **kwargs)
+
+class CancelingPNEditor(BasicPNEditor):
+    
+    def __init__(self, parent, *args, **kwargs):
+        
+        BasicPNEditor.__init__(self, parent, *args, **kwargs)

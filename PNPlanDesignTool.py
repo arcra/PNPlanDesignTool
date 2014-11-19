@@ -278,17 +278,17 @@ class PNPDT(object):
             
             sub_name = 'Executing rules' if is_primitive_action else 'Decomposing rules'
             sub_id = item_id + ('Executing_rules/' if is_primitive_action else 'Decomposing_Rules/')
-            self.project_tree.insert(item_id, 'end', sub_id, text = sub_name, tags = sub_tags + ['dexec'])
+            self.project_tree.insert(item_id, 'end', sub_id, text = sub_name, tags = sub_tags + ['dexec'], open = True)
             self._adjust_width(sub_name, sub_id)
             
             sub_name = 'Finalizing rules'
             sub_id = item_id + 'Finalizing_rules/'
-            self.project_tree.insert(item_id, 'end', sub_id, text = sub_name, tags = sub_tags + ['Finalizing'])
+            self.project_tree.insert(item_id, 'end', sub_id, text = sub_name, tags = sub_tags + ['finalizing'], open = True)
             self._adjust_width(sub_name, sub_id)
             
             sub_name = 'Canceling rules'
             sub_id = item_id + 'Canceling_rules/'
-            self.project_tree.insert(item_id, 'end', sub_id, text = sub_name, tags = sub_tags + ['canceling'])
+            self.project_tree.insert(item_id, 'end', sub_id, text = sub_name, tags = sub_tags + ['canceling'], open = True)
             self._adjust_width(sub_name, sub_id)
             
         except Exception as e:
