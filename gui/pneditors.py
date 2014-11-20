@@ -9,8 +9,9 @@ import tkFont
 import tkMessageBox
 
 from copy import deepcopy
-from petrinets import BasicPetriNet
-from nodes import Place, Transition, TRANSITION_CLASSES, PLACE_CLASSES
+from petrinets import BasicPetriNet, NonPrimitiveTaskPN
+from nodes import Place, Transition, TRANSITION_CLASSES, PLACE_CLASSES,\
+    PreconditionsTransition
 from settings import *
 from utils import Vec2
 from auxdialogs import PositiveIntDialog, NonNegativeFloatDialog, NonNegativeIntDialog
@@ -33,7 +34,7 @@ class BasicPNEditor(Tkinter.Canvas):
     #_NAME_REGEX = re.compile('^[a-zA-Z][a-zA-Z0-9_ -]*( ?\([a-zA-Z0][a-zA-Z0-9_ -]*(, ?[a-zA-Z0][a-zA-Z0-9_ -]*)*\))?$')
     _TOKEN_RADIUS = 3
     
-    def __init__(self, parent, *args, **kwargs):
+    def __init__(self, parent, PetriNetClass = BasicPetriNet,*args, **kwargs):
         """
         BasePNEditor constructor.
         
@@ -67,7 +68,7 @@ class BasicPNEditor(Tkinter.Canvas):
         if not self._petri_net:
             if not petri_net_name:
                 raise Exception('The PetriNet name cannot be an empty string.')
-            self._petri_net = BasicPetriNet(petri_net_name, task)
+            self._petri_net = PetriNetClass(petri_net_name, task)
         
         self._create_menus()
         
@@ -96,7 +97,7 @@ class BasicPNEditor(Tkinter.Canvas):
         ################################
         #        EVENT BINDINGs
         ################################
-        self.bind('<Button-1>', self._left_click)
+        self.bind('<Button-1>', self._dispatch_left_click)
         self.bind('<B1-Motion>', self._dragCallback)
         self.bind('<ButtonRelease-1>', self._change_cursor_back)
         self.bind('<KeyPress-c>', self._center_diagram)
@@ -147,35 +148,35 @@ class BasicPNEditor(Tkinter.Canvas):
                                                                     ('Toggle grid', self._toggle_grid),
                                                                     ("Toggle transition's labels", self._toggle_transitions_labels)
                                                                 ],
-                                       'place_properties' : [
+                                       'generic_place_properties' : [
                                                           ('Rename Place', self._rename_place),
                                                           ('Set Initial Marking', self._set_initial_marking),
                                                           ('Set Capacity', self._set_capacity)
                                                         ],
-                                       'place_operations' : [
+                                       'generic_place_operations' : [
                                                           ('Remove Place', self._remove_place),
                                                         ],
-                                       'place_connections' : [
+                                       'generic_place_connections' : [
                                                           ('Connect to...', self._connect_place_to, '(Double click)'),
                                                           ('Connect to...(bidirectional)', self._connect_place_to_bidirectional, '(Shift+Double click)')
                                                         ],
-                                       'transition_properties' : [
+                                       'generic_transition_properties' : [
                                                                ('Rename Transition', self._rename_transition),
                                                                ('Switch orientation', self._switch_orientation),
                                                                ('Set Rate', self._set_rate),
                                                                ('Set Priority', self._set_priority)
                                                             ],
-                                       'transition_operations' : [
+                                       'generic_transition_operations' : [
                                                                ('Remove Transition', self._remove_transition)
                                                             ],
-                                       'transition_connections' : [
+                                       'generic_transition_connections' : [
                                                                ('Connect to...', self._connect_transition_to, '(Double click)'),
                                                                ('Connect to...(bidirectional)', self._connect_transition_to_bidirectional, '(Shift+Double click)')
                                                             ],
-                                       'arc_properties' : [
+                                       'generic_arc_properties' : [
                                                         ('Set Weight', self._set_weight)
                                                     ],
-                                       'arc_operations' : [
+                                       'generic_arc_operations' : [
                                                         ('Remove arc', self._remove_arc)
                                                     ]
                                 }
@@ -188,9 +189,9 @@ class BasicPNEditor(Tkinter.Canvas):
         
         self._menus_dict = {
                             'canvas' : ['canvas'],
-                            'Place' : ['place_properties', 'place_operations', 'place_connections'],
-                            'Transition' : ['transition_properties', 'transition_operations', 'transition_connections'],
-                            'Arc' : ['arc_properties', 'arc_operations']
+                            'place' : ['generic_place_properties', 'generic_place_operations', 'generic_place_connections'],
+                            'transition' : ['generic_transition_properties', 'generic_transition_operations', 'generic_transition_connections'],
+                            'arc' : ['generic_arc_properties', 'generic_arc_operations']
                             }
     
     def _build_menus(self):
@@ -1017,12 +1018,12 @@ class BasicPNEditor(Tkinter.Canvas):
         """Draws a transition object in the canvas widget."""
         trans_id = self._draw_transition_item(transition = t)
         
-        if t.isHorizontal:
-            padding = TRANSITION_HORIZONTAL_LABEL_PADDING
-        else:
-            padding = TRANSITION_VERTICAL_LABEL_PADDING
-        
         if self._label_transitions:
+            if t.isHorizontal:
+                padding = TRANSITION_HORIZONTAL_LABEL_PADDING
+            else:
+                padding = TRANSITION_VERTICAL_LABEL_PADDING
+            
             self.create_text(t.position.x,
                            t.position.y + padding*self._current_scale,
                            tags = ('label',) + self.gettags(trans_id),
@@ -1468,6 +1469,7 @@ class BasicPNEditor(Tkinter.Canvas):
         if transition:
             point = transition.position
             transition_tag = 'transition_' + repr(transition)
+            TransitionClass = transition.__class__
         elif not (point and TransitionClass):
             raise Exception('Neither location nor transition class was specified.')
         
@@ -1931,7 +1933,10 @@ class BasicPNEditor(Tkinter.Canvas):
     
     def _get_intersection_side(self, t, point):
         """This is used to compute the side where an arc hits an edge
-            of a transition's graphic representation (rectangle)."""
+            of a transition's graphic representation (rectangle).
+            
+            It is useful for adding an offset to the circle of an inhibitor arc (and the arc's end).
+        """
         
         if t.isHorizontal:
             half_width = TRANSITION_HALF_LARGE
@@ -2069,7 +2074,7 @@ class BasicPNEditor(Tkinter.Canvas):
         else:
             self._scale_down(event)
     
-    def _left_click(self, event):
+    def _dispatch_left_click(self, event):
         """Callback for the left-click event.
         
             It determines what to do depending
@@ -2078,6 +2083,10 @@ class BasicPNEditor(Tkinter.Canvas):
         
         self.focus_set()
         
+        self._left_click(event)
+    
+    def _left_click(self, event):
+        
         if self._hide_menu():
             return
         
@@ -2085,6 +2094,7 @@ class BasicPNEditor(Tkinter.Canvas):
             self._set_anchor(event)
             return
         
+        #Prevent left click to trigger when cursor is outside of the workspace
         if event.x < 0 or event.y < 0:
             return
         
@@ -2236,21 +2246,21 @@ class BasicPNEditor(Tkinter.Canvas):
 
 class RegularPNEditor(BasicPNEditor):
     
-    def __init__(self, parent, *args, **kwargs):
+    def __init__(self, parent, PetriNetClass = BasicPetriNet, *args, **kwargs):
         
-        BasicPNEditor.__init__(self, parent, *args, **kwargs)
+        BasicPNEditor.__init__(self, parent, PetriNetClass,*args, **kwargs)
         
     def _configure_menus(self):
         
-        self._menus_options_sets_dict['place_connections'].append(
+        self._menus_options_sets_dict['generic_place_connections'].append(
                             ('Connect to...(inhibitor)', self._connect_place_to_inhibitor, "(Control+Double click)")
                         )
                     
         self._menus_dict = {
                             'canvas' : ['canvas'],
-                            'Place' : ['place_properties', 'place_operations', 'place_connections'],
-                            'Transition' : ['transition_properties', 'transition_operations', 'transition_connections'],
-                            'Arc' : ['arc_properties', 'arc_operations']
+                            'Place' : ['generic_place_properties', 'generic_place_operations', 'generic_place_connections'],
+                            'Transition' : ['generic_transition_properties', 'generic_transition_operations', 'generic_transition_connections'],
+                            'arc' : ['generic_arc_properties', 'generic_arc_operations']
                             }
         
         self.bind('<Control-Double-1>', self._set_connecting_inhibitor)
@@ -2283,17 +2293,37 @@ class RegularPNEditor(BasicPNEditor):
     
 class NonPrimitiveTaskPNEditor(RegularPNEditor):
     
-    def __init__(self, parent, *args, **kwargs):
+    def __init__(self, parent, PetriNetClass = NonPrimitiveTaskPN, *args, **kwargs):
         
-        RegularPNEditor.__init__(self, parent, *args, **kwargs)
+        RegularPNEditor.__init__(self, parent, PetriNetClass, *args, **kwargs)
     
     def _configure_menus(self):
         
         RegularPNEditor._configure_menus(self)
         
-        #override self._menus_options_sets_dict['canvas']
+        #override self._menus_options_sets_dict['canvas'] or self._menus_dict['canvas']
+        self._menus_dict['canvas'] = []
         
         #ADD NonPrimitiveTaskPNEditor options
+        
+        #Preconditions Transition
+        self._menus_options_sets_dict['preconditions_operations'] = [
+                                                                     ('Add Non-Primitive Task', self._add_non_primitive_task),
+                                                                     ('Add Primitive Task', self._add_non_primitive_task)
+                                                                    ]
+        self._menus_dict[PreconditionsTransition.__name__] = ['preconditions_operations', 'generic_transition_properties', 'generic_transition_operations', 'generic_transition_connections']  # @UndefinedVariable
+    
+    def _add_non_primitive_task(self):
+        pass
+    
+    def _add_primitive_task(self):
+        pass
+    
+    def _left_click(self, event):
+        
+        #Call other left_click handlers
+        
+        RegularPNEditor._left_click(self, event)
         
         
 class PrimitiveTaskPNEditor(BasicPNEditor):

@@ -14,9 +14,9 @@ import tkMessageBox
 import zipfile
 import tempfile
 
-from petrinets import BasicPetriNet
 from gui.tabmanager import TabManager
-from gui.pneditors import RegularPNEditor
+from gui.pneditors import RegularPNEditor, NonPrimitiveTaskPNEditor,\
+    PrimitiveTaskPNEditor, FinalizingPNEditor, CancelingPNEditor
 from gui.auxdialogs import InputDialog
 
 class PNPDT(object):
@@ -117,16 +117,32 @@ class PNPDT(object):
         self.petri_nets = {}
         self.file_path = None
         
-        self.task_type_folder_menu = tk.Menu(self.root, tearoff = 0)
-        self.task_type_folder_menu.add_command(label = 'Add Task', command = self.create_task)
-        self.task_type_folder_menu.add_command(label = 'Import Task', command = self.import_task)
+        self.non_primitive_task_folder_menu = tk.Menu(self.root, tearoff = 0)
+        self.non_primitive_task_folder_menu.add_command(label = 'Add Task', command = self.create_non_primitive_task)
+        self.non_primitive_task_folder_menu.add_command(label = 'Import Task', command = self.import_non_primitive_task)
+        
+        self.primitive_task_folder_menu = tk.Menu(self.root, tearoff = 0)
+        self.primitive_task_folder_menu.add_command(label = 'Add Task', command = self.create_primitive_task)
+        self.primitive_task_folder_menu.add_command(label = 'Import Task', command = self.import_primitive_task)
         
         self.task_folder_menu = tk.Menu(self.root, tearoff = 0)
         self.task_folder_menu.add_command(label = 'Rename', command = self.rename_task)
         
-        self.subfolder_menu = tk.Menu(self.root, tearoff = 0)
-        self.subfolder_menu.add_command(label = 'Add Rule', command = self.create_petri_net)
-        self.subfolder_menu.add_command(label = 'Import Rule from PNML file', command = self.import_from_PNML)
+        self.non_primitive_task_menu = tk.Menu(self.root, tearoff = 0)
+        self.non_primitive_task_menu.add_command(label = 'Add Rule', command = self.create_non_primitive_task_pn)
+        self.non_primitive_task_menu.add_command(label = 'Import Rule from PNML file', command = self.import_non_primitive_from_PNML)
+        
+        self.primitive_task_menu = tk.Menu(self.root, tearoff = 0)
+        self.primitive_task_menu.add_command(label = 'Add Rule', command = self.create_primitive_task_pn)
+        self.primitive_task_menu.add_command(label = 'Import Rule from PNML file', command = self.import_primitive_from_PNML)
+        
+        self.finalizing_menu = tk.Menu(self.root, tearoff = 0)
+        self.finalizing_menu.add_command(label = 'Add Rule', command = self.create_finalizing)
+        self.finalizing_menu.add_command(label = 'Import Rule from PNML file', command = self.import_finalizing_from_PNML)
+        
+        self.canceling_menu = tk.Menu(self.root, tearoff = 0)
+        self.canceling_menu.add_command(label = 'Add Rule', command = self.create_canceling)
+        self.canceling_menu.add_command(label = 'Import Rule from PNML file', command = self.import_canceling_from_PNML)
         
         self.petri_net_menu = tk.Menu(self.root, tearoff = 0)
         self.petri_net_menu.add_command(label = 'Open', command = self.open_petri_net)
@@ -134,37 +150,25 @@ class PNPDT(object):
         self.petri_net_menu.add_command(label = 'Delete', command = self.delete_petri_net)
         self.petri_net_menu.add_command(label = 'Export Task', command = self.export_to_PNML)
         
-        #MAC OS:
-        if (self.root.tk.call('tk', 'windowingsystem')=='aqua'):
-            self.project_tree.tag_bind('top_level', '<2>', self.popup_task_type_folder_menu)
-            self.project_tree.tag_bind('top_level', '<Control-1>', self.popup_task_type_folder_menu)
-        #Windows / UNIX / Linux:
-        else:
-            self.project_tree.tag_bind('top_level', '<3>', self.popup_task_type_folder_menu)
+        right_click_tag_bindings = {
+                        'non_primitive_action' : self.popup_non_primitive_task_folder_menu,
+                        'primitive_action' : self.popup_primitive_task_folder_menu,
+                        'task' : self.popup_task_folder_menu,
+                        'non_primitive_task_pn' : self.popup_non_primitive_task_menu,
+                        'primitive_task_pn' : self.popup_primitive_task_menu,
+                        'finalizing' : self.popup_finalizing_menu,
+                        'canceling' : self.popup_canceling_menu,
+                        'petri_net' : self.popup_petri_net_menu
+                        }
         
-        if (self.root.tk.call('tk', 'windowingsystem')=='aqua'):
-            self.project_tree.tag_bind('task', '<2>', self.popup_task_folder_menu)
-            self.project_tree.tag_bind('task', '<Control-1>', self.popup_task_folder_menu)
-        #Windows / UNIX / Linux:
-        else:
-            self.project_tree.tag_bind('task', '<3>', self.popup_task_folder_menu)
-        
-        #MAC OS:
-        if (self.root.tk.call('tk', 'windowingsystem')=='aqua'):
-            self.project_tree.tag_bind('subfolder', '<2>', self.popup_subfolder_menu)
-            self.project_tree.tag_bind('subfolder', '<Control-1>', self.popup_subfolder_menu)
-        #Windows / UNIX / Linux:
-        else:
-            self.project_tree.tag_bind('subfolder', '<3>', self.popup_subfolder_menu)
-            
-        #MAC OS:
-        if (self.root.tk.call('tk', 'windowingsystem')=='aqua'):
-            self.project_tree.tag_bind('petri_net', '<2>', self.popup_petri_net_menu)
-            self.project_tree.tag_bind('petri_net', '<Control-1>', self.popup_petri_net_menu)
-        #Windows / UNIX / Linux:
-        else:
-            self.project_tree.tag_bind('petri_net', '<3>', self.popup_petri_net_menu)
-        
+        for tag, handler in right_click_tag_bindings.iteritems():
+            #MAC OS:
+            if (self.root.tk.call('tk', 'windowingsystem')=='aqua'):
+                self.project_tree.tag_bind(tag, '<2>', handler)
+                self.project_tree.tag_bind(tag, '<Control-1>', handler)
+            #Windows / UNIX / Linux:
+            else:
+                self.project_tree.tag_bind(tag, '<3>', handler)
         
         self.project_tree.tag_bind('petri_net', '<Double-1>', self.open_callback)
         self.root.bind('<Button-1>', self._hide_menu)
@@ -187,25 +191,45 @@ class PNPDT(object):
         self.status_label.configure(textvariable = pne.status_var)
         pne.focus_set()
     
-    def popup_task_type_folder_menu(self, event):
+    def popup_non_primitive_task_folder_menu(self, event):
         self.clicked_element = self.project_tree.identify('item', event.x, event.y)
-        self.popped_up_menu = self.task_type_folder_menu
-        self.task_type_folder_menu.post(event.x_root, event.y_root)
+        self.popped_up_menu = self.non_primitive_task_folder_menu
+        self.popped_up_menu.post(event.x_root, event.y_root)
+    
+    def popup_primitive_task_folder_menu(self, event):
+        self.clicked_element = self.project_tree.identify('item', event.x, event.y)
+        self.popped_up_menu = self.primitive_task_folder_menu
+        self.popped_up_menu.post(event.x_root, event.y_root)
     
     def popup_task_folder_menu(self, event):
         self.clicked_element = self.project_tree.identify('item', event.x, event.y)
         self.popped_up_menu = self.task_folder_menu
-        self.task_folder_menu.post(event.x_root, event.y_root)
+        self.popped_up_menu.post(event.x_root, event.y_root)
     
-    def popup_subfolder_menu(self, event):
+    def popup_non_primitive_task_menu(self, event):
         self.clicked_element = self.project_tree.identify('item', event.x, event.y)
-        self.popped_up_menu = self.subfolder_menu
-        self.subfolder_menu.post(event.x_root, event.y_root)
+        self.popped_up_menu = self.non_primitive_task_menu
+        self.popped_up_menu.post(event.x_root, event.y_root)
+        
+    def popup_primitive_task_menu(self, event):
+        self.clicked_element = self.project_tree.identify('item', event.x, event.y)
+        self.popped_up_menu = self.primitive_task_menu
+        self.popped_up_menu.post(event.x_root, event.y_root)
+    
+    def popup_finalizing_menu(self, event):
+        self.clicked_element = self.project_tree.identify('item', event.x, event.y)
+        self.popped_up_menu = self.finalizing_menu
+        self.popped_up_menu.post(event.x_root, event.y_root)
+        
+    def popup_canceling_menu(self, event):
+        self.clicked_element = self.project_tree.identify('item', event.x, event.y)
+        self.popped_up_menu = self.canceling_menu
+        self.popped_up_menu.post(event.x_root, event.y_root)
     
     def popup_petri_net_menu(self, event):
         self.clicked_element = self.project_tree.identify('item', event.x, event.y)
         self.popped_up_menu = self.petri_net_menu
-        self.petri_net_menu.post(event.x_root, event.y_root)
+        self.popped_up_menu.post(event.x_root, event.y_root)
     
     def _hide_menu(self, event):
         """Hides a popped-up menu."""
@@ -249,7 +273,13 @@ class PNPDT(object):
             self.tab_manager.select(pne)
         return pne
     
-    def create_task(self, name = None):
+    def create_non_primitive_task(self):
+        self.create_task(is_primitive_action = False)
+    
+    def create_primitive_task(self):
+        self.create_task(is_primitive_action = True)
+    
+    def create_task(self, name = None, is_primitive_action = True):
         
         if name is None:
             dialog = InputDialog('Task name',
@@ -266,19 +296,19 @@ class PNPDT(object):
         
         try:
             item_tags = ['task', 'folder', 'task_' + name]
-            is_primitive_action = self.project_tree.tag_has('primitive_action', self.clicked_element)
             
-            item_tags.append('primitive_action' if is_primitive_action else 'non_primitive_action')
+            item_tags.append('primitive_task' if is_primitive_action else 'non_primitive_task')
             self.project_tree.insert(self.clicked_element, 'end', item_id, text = name, tags = item_tags, open = True)
             self._adjust_width(name, item_id)
             
             
-            sub_tags = item_tags + ['subfolder']
+            sub_tags = item_tags
             sub_tags.remove('task')
             
             sub_name = 'Executing rules' if is_primitive_action else 'Decomposing rules'
             sub_id = item_id + ('Executing_rules/' if is_primitive_action else 'Decomposing_Rules/')
-            self.project_tree.insert(item_id, 'end', sub_id, text = sub_name, tags = sub_tags + ['dexec'], open = True)
+            sub_tag = 'primitive_task_pn' if is_primitive_action else 'non_primitive_task_pn'
+            self.project_tree.insert(item_id, 'end', sub_id, text = sub_name, tags = sub_tags + [sub_tag], open = True)
             self._adjust_width(sub_name, sub_id)
             
             sub_name = 'Finalizing rules'
@@ -297,7 +327,19 @@ class PNPDT(object):
         
         return item_id
     
-    def create_petri_net(self, pne_object = None):
+    def create_non_primitive_task_pn(self):
+        self.create_petri_net(PNEditorClass = NonPrimitiveTaskPNEditor)
+    
+    def create_primitive_task_pn(self):
+        self.create_petri_net(PNEditorClass = PrimitiveTaskPNEditor)
+    
+    def create_finalizing(self):
+        self.create_petri_net(PNEditorClass = FinalizingPNEditor)
+    
+    def create_canceling(self):
+        self.create_petri_net(PNEditorClass = CancelingPNEditor)
+    
+    def create_petri_net(self, pne_object = None, PNEditorClass = RegularPNEditor):
         
         if pne_object:
             name = pne_object.name
@@ -325,20 +367,23 @@ class PNPDT(object):
         item_id = self.clicked_element + name
         
         item_tags = list(self.project_tree.item(self.clicked_element, "tags")) + ['petri_net']
-        item_tags.remove('subfolder')
         item_tags.remove('folder')
         
         try:
+            if pne_object:
+                self._add_pne(item_id, pne_object = pne_object, open_tab = False)
+            else:
+                pne_object = self._add_pne(item_id, pn_name = name, task = task, PNEditorClass = PNEditorClass)
+            pne_object.edited = True
+        except Exception as e:
+            tkMessageBox.showerror('ERROR', str(e))
+            return
+            
             self.project_tree.insert(self.clicked_element, 'end', item_id, text = name, tags = item_tags)
             self._adjust_width(name, item_id)
         except Exception as e:
             tkMessageBox.showerror('ERROR', 'The Petri Net could not be inserted in the selected node, possible duplicate name.\n\n' + str(e))
             return
-        
-        if pne_object:
-            self._add_pne(item_id, pne_object = pne_object, open_tab = False)
-        else:
-            self._add_pne(item_id, pn_name = name, task = task)
     
     def rename_task(self):
         
@@ -369,7 +414,6 @@ class PNPDT(object):
                 pne = self.delete_petri_net(pn_id)
                 self.create_petri_net(pne)
         
-        #DO ALL
         self.project_tree.delete(old_id)
     
     def open_callback(self, event):
@@ -385,16 +429,31 @@ class PNPDT(object):
         
         self.tab_manager.select(pne)
     
-    def import_task(self):
-        
+    def import_non_primitive_task(self):
         zip_filename = tkFileDialog.askopenfilename(
-                                              defaultextension = '.tsk',
-                                              filetypes=[('PNPDT Task file', '*.tsk')],
-                                              title = 'Open PNPDT Task file...',
+                                              defaultextension = '.np.tsk',
+                                              filetypes=[('PNPDT Non Primitive Task file', '*.np.tsk')],
+                                              title = 'Open PNPDT Non Primitive Task file...',
                                               initialdir = os.path.expanduser('~/Desktop')
                                               )
         if not zip_filename:
             return
+        
+        self._import_task(zip_filename)
+    
+    def import_primitive_task(self):
+        zip_filename = tkFileDialog.askopenfilename(
+                                              defaultextension = '.p.tsk',
+                                              filetypes=[('PNPDT Primitive Task file', '*.p.tsk')],
+                                              title = 'Open PNPDT Primitive Task file...',
+                                              initialdir = os.path.expanduser('~/Desktop')
+                                              )
+        if not zip_filename:
+            return
+        
+        self._import_task(zip_filename)
+    
+    def _import_task(self, zip_filename):
         
         zip_file = zipfile.ZipFile(zip_filename, 'r')
         
@@ -425,24 +484,58 @@ class PNPDT(object):
         
         self.status_var.set('Imported task: ' + task_name)
     
-    def import_from_PNML(self):
+    def import_non_primitive_from_PNML(self):
         filename = tkFileDialog.askopenfilename(
-                                              defaultextension = '.pnml',
-                                              filetypes=[('Standard PNML file', '*.pnml'), ('Standard PNML file', '*.pnml.xml')],
-                                              title = 'Open Standard PNML file...',
+                                              defaultextension = '.npt.pnml',
+                                              filetypes=[('Non Primitive Task PNML file', '*.npt.pnml')],
+                                              title = 'Open Non Primitive Task PNML file...',
                                               initialdir = os.path.expanduser('~/Desktop')
                                               )
         if not filename:
             return
         
-        item_id = self._import_from_pnml(filename, self.clicked_element)
-        pne = self.petri_nets[item_id]
-        self.tab_manager.add(pne, text = pne.name)
-        self.tab_manager.select(pne)
+        self._import_from_pnml(filename, NonPrimitiveTaskPNEditor)
+    
+    def import_primitive_from_PNML(self):
+        filename = tkFileDialog.askopenfilename(
+                                              defaultextension = '.pt.pnml',
+                                              filetypes=[('Primitive Task PNML file', '*.pt.pnml')],
+                                              title = 'Open Primitive Task PNML file...',
+                                              initialdir = os.path.expanduser('~/Desktop')
+                                              )
+        if not filename:
+            return
         
-    def _import_from_pnml(self, filename, parent):
+        self._import_from_pnml(filename, PrimitiveTaskPNEditor)
+    
+    def import_finalizing_from_PNML(self):
+        filename = tkFileDialog.askopenfilename(
+                                              defaultextension = '.f.pnml',
+                                              filetypes=[('Finalizing Rule PNML file', '*.f.pnml')],
+                                              title = 'Open Finalizing Rule PNML file...',
+                                              initialdir = os.path.expanduser('~/Desktop')
+                                              )
+        if not filename:
+            return
+        
+        self._import_from_pnml(filename, FinalizingPNEditor)
+    
+    def import_canceling_from_PNML(self):
+        filename = tkFileDialog.askopenfilename(
+                                              defaultextension = '.c.pnml',
+                                              filetypes=[('Canceling Rule PNML file', '*.c.pnml')],
+                                              title = 'Open Canceling Rule PNML file...',
+                                              initialdir = os.path.expanduser('~/Desktop')
+                                              )
+        if not filename:
+            return
+        
+        self._import_from_pnml(filename, CancelingPNEditor)
+        
+    def _import_from_pnml(self, filename, PNEditorClass):
+        
         try:
-            petri_nets = BasicPetriNet.from_pnml_file(filename)
+            petri_nets = PNEditorClass.from_pnml_file(filename)
         except Exception as e:
             tkMessageBox.showerror('Error reading PNML file.', 'An error occurred while reading the PNML file.\n\n' + str(e))
             return
@@ -455,19 +548,11 @@ class PNPDT(object):
         except Exception as e:
             tkMessageBox.showerror('Error loading PetriNet.', 'An error occurred while loading the PetriNet object.\n\n' + str(e))
         
-        name = pn.name
-        item_id = parent + name
-        
-        try:
-            self.project_tree.insert(parent, 'end', item_id, text = name, tags = ['petri_net'])
-            self._adjust_width(name, item_id)
-        except Exception as e:
-            tkMessageBox.showerror('ERROR', 'Petri Net could not be inserted in the selected node, possible duplicate name.\n\n' + str(e))
-            return
-        
-        pne = self._add_pne(item_id, open_tab = False, pn_object = pn)
+        pne = PNEditorClass(self.tab_manager, PetriNet = pn)
+        self.create_petri_net(pne_object = pne)
         pne.edited = False
-        return item_id
+        self.tab_manager.add(pne, text = pne.name)
+        self.tab_manager.select(pne)
     
     def rename_petri_net(self):
         old_name = self.project_tree.item(self.clicked_element, 'text')
