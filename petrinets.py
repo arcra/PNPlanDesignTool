@@ -10,7 +10,7 @@ import os
 import lxml.etree as ET
 
 from nodes import Place, Transition, PreconditionsTransition, _Arc, _get_treeElement,\
-    RuleTransition
+    RuleTransition, SequenceTransition
 from utils import Vec2
 
 class BasicPetriNet(object):
@@ -456,11 +456,21 @@ class NonPrimitiveTaskPN(BasicPetriNet):
         super(NonPrimitiveTaskPN, self).__init__(name, task, _net)
     
     def _initialize(self):
-        self.add_transition(PreconditionsTransition(self.name, Vec2(300, 300)))
+        self.add_transition(PreconditionsTransition(self.name, Vec2(180, 300)))
     
     @classmethod
     def from_pnml_file(cls, filename):
         BasicPetriNet.from_pnml_file(filename, cls)
+    
+    def add_arc(self, source, target, weight = 1, _treeElement = None):
+        
+        #Assert
+        
+        if isinstance(target, SequenceTransition) and len(target._incoming_arcs) > 0:
+            raise Exception('A Sequence Transition cannot have more than one tasks connected to it.\n\
+            If synchronization is needed, two hierarchy levels must be created.')
+        
+        return super(NonPrimitiveTaskPN, self).add_arc(source, target, weight, _treeElement)
 
 class PrimitiveTaskPN(BasicPetriNet):
     

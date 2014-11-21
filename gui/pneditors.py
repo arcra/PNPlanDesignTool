@@ -11,7 +11,7 @@ import tkMessageBox
 from copy import deepcopy
 from petrinets import BasicPetriNet, NonPrimitiveTaskPN
 from nodes import Place, Transition, TRANSITION_CLASSES, PLACE_CLASSES,\
-    PreconditionsTransition
+    PreconditionsTransition, NonPrimitiveTaskPlace, SequenceTransition
 from settings import *
 from utils import Vec2
 from auxdialogs import PositiveIntDialog, NonNegativeFloatDialog, NonNegativeIntDialog
@@ -104,6 +104,7 @@ class BasicPNEditor(Tkinter.Canvas):
         self.bind('<KeyPress-C>', self._center_diagram)
         self.bind('<Control-z>', self._undo)
         self.bind('<Control-y>', self._redo)
+        self.bind('<Escape>', self._escape)
         
         ##########################################
         #    BINDING MOUSE WHEEL SCROLL
@@ -1117,7 +1118,24 @@ class BasicPNEditor(Tkinter.Canvas):
         self.delete('label&&place_' + repr(p))
         canvas_id = self.find_withtag('place_' + repr(p))[0]
         
-        self._set_rename_place_entry(canvas_id, p)
+        txtbox = Tkinter.Entry(self)
+        txtbox.insert(0, str(p))
+        txtbox.selection_range(0, Tkinter.END)
+        
+        #extra padding because entry position refers to the center, not the corner
+        label_padding = PLACE_LABEL_PADDING + 10
+        
+        txtbox_id = self.create_window(p.position.x, p.position.y + label_padding*self._current_scale, height= 20, width = 85, window = txtbox)
+        txtbox.wait_visibility()
+        txtbox.grab_set()
+        txtbox.focus_set()
+        
+        callback = self._get_rename_place_callback(txtbox, txtbox_id, canvas_id, p)
+        
+        escape_callback = self._get_cancel_rename_place_callback(txtbox, txtbox_id, canvas_id, p)
+        
+        txtbox.bind('<KeyPress-Return>', callback)
+        txtbox.bind('<KeyPress-Escape>', escape_callback)
         
     def _rename_transition(self):
         """Menu callback to rename clicked transition.
@@ -1152,7 +1170,27 @@ class BasicPNEditor(Tkinter.Canvas):
         self.delete('label&&transition_' + repr(t))
         canvas_id = self.find_withtag('transition_' + repr(t))[0]
         
-        self._set_rename_transition_entry(canvas_id, t)
+        txtbox = Tkinter.Entry(self)
+        txtbox.insert(0, str(t))
+        txtbox.selection_range(0, Tkinter.END)
+        
+        #extra padding because entry position refers to the center, not the corner
+        if t.isHorizontal:
+            label_padding = TRANSITION_HORIZONTAL_LABEL_PADDING + 10
+        else:
+            label_padding = TRANSITION_VERTICAL_LABEL_PADDING + 10
+        
+        txtbox_id = self.create_window(t.position.x, t.position.y + label_padding*self._current_scale, height= 20, width = 85, window = txtbox)
+        txtbox.wait_visibility()
+        txtbox.grab_set()
+        txtbox.focus_set()
+        
+        callback = self._get_rename_transition_callback(txtbox, txtbox_id, canvas_id, t)
+        
+        escape_callback = self._get_cancel_rename_transition_callback(txtbox, txtbox_id, canvas_id, t)
+        
+        txtbox.bind('<KeyPress-Return>', callback)
+        txtbox.bind('<KeyPress-Escape>', escape_callback)
     
     def _switch_orientation(self):
         """Menu callback to switch clicked transition's orientation."""
@@ -1182,6 +1220,7 @@ class BasicPNEditor(Tkinter.Canvas):
         txtbox.insert(0, str(p.init_marking))
         txtbox.selection_range(0, Tkinter.END)
         txtbox_id = self.create_window(p.position.x, p.position.y, height= 20, width = 20, window = txtbox)
+        txtbox.wait_visibility()
         txtbox.grab_set()
         txtbox.focus_set()
         
@@ -1371,15 +1410,18 @@ class BasicPNEditor(Tkinter.Canvas):
         self._hide_menu()
         self._create_place(PlaceClass = Place)
         
-    def _create_place(self, PlaceClass):
+    def _create_place(self, PlaceClass, point = None, afterFunction = None, afterCancelFunction = None):
         """Creates a Place object, draws it and sets the label entry for entering the name."""
+        
+        if not point:
+            point = self._last_point
         
         #Adjust height when label is occluded
         #h = int(self.config()['height'][4])
         h = self.winfo_height()
         if h == 1:
             h = self.winfo_reqheight()
-        entry_y = self._last_point.y + (PLACE_LABEL_PADDING + 10)*self._current_scale + 10
+        entry_y = point.y + (PLACE_LABEL_PADDING + 10)*self._current_scale + 10
         if entry_y > h:
             diff = Vec2(0.0, h - entry_y)
             self.move('all', diff.x, diff.y)
@@ -1392,11 +1434,28 @@ class BasicPNEditor(Tkinter.Canvas):
                 self._grid_offset = (self._grid_offset + diff).int
                 self._draw_grid()
             
-            self._last_point += diff
+            point += diff
         
-        item = self._draw_place_item(self._last_point, PlaceClass = PlaceClass)
-        p = PlaceClass('P{0:0>3d}'.format(self._petri_net._place_counter + 1), self._last_point)
-        self._set_create_place_entry(item, p)
+        canvas_id = self._draw_place_item(point, PlaceClass = PlaceClass)
+        p = PlaceClass('P{0:0>3d}'.format(self._petri_net._place_counter + 1), point)
+        
+        txtbox = Tkinter.Entry(self)
+        txtbox.insert(0, str(p))
+        txtbox.selection_range(0, Tkinter.END)
+        #extra padding because entry position refers to the center, not the corner
+        label_padding = PLACE_LABEL_PADDING + 10
+        
+        txtbox_id = self.create_window(p.position.x, p.position.y + label_padding*self._current_scale, height= 20, width = 85, window = txtbox)
+        txtbox.wait_visibility()
+        txtbox.grab_set()
+        txtbox.focus_set()
+        
+        callback = self._get_create_place_callback(txtbox, txtbox_id, canvas_id, p, afterFunction = afterFunction)
+        
+        escape_callback = self._get_cancel_create_callback(txtbox, txtbox_id, canvas_id, p, afterCancelFunction = afterCancelFunction)
+        
+        txtbox.bind('<KeyPress-Return>', callback)
+        txtbox.bind('<KeyPress-Escape>', escape_callback)
     
     def _create_regular_transition(self):
         """Menu callback to create a REGULAR transition."""
@@ -1425,9 +1484,29 @@ class BasicPNEditor(Tkinter.Canvas):
                 self._draw_grid()
             self._last_point += diff
         
-        item = self._draw_transition_item(self._last_point, TransitionClass)
+        canvas_id = self._draw_transition_item(self._last_point, TransitionClass)
         t = TransitionClass('{0:0>3d}'.format(self._petri_net._transition_counter + 1), self._last_point)
-        self._set_create_transition_entry(item, t)
+        
+        txtbox = Tkinter.Entry(self)
+        txtbox.insert(0, str(t))
+        txtbox.selection_range(0, Tkinter.END)
+        #extra padding because entry position refers to the center, not the corner
+        if t.isHorizontal:
+            label_padding = TRANSITION_HORIZONTAL_LABEL_PADDING + 10
+        else:
+            label_padding = TRANSITION_VERTICAL_LABEL_PADDING + 10
+        
+        txtbox_id = self.create_window(t.position.x, t.position.y + label_padding*self._current_scale, height= 20, width = 85, window = txtbox)
+        txtbox.wait_visibility()
+        txtbox.grab_set()
+        txtbox.focus_set()
+        
+        callback = self._get_create_transition_callback(txtbox, txtbox_id, canvas_id, t)
+        
+        escape_callback = self._get_cancel_create_callback(txtbox, txtbox_id, canvas_id, t)
+        
+        txtbox.bind('<KeyPress-Return>', callback)
+        txtbox.bind('<KeyPress-Escape>', escape_callback)
     
     def _draw_place_item(self, point = None, PlaceClass = Place, place = None):
         """Draws a place item, with the attributes corresponding to the place class.
@@ -1443,7 +1522,6 @@ class BasicPNEditor(Tkinter.Canvas):
         elif not (point and PlaceClass):
             raise Exception('Neither location nor place class was specified.')
             
-        
         item = self.create_oval(point.x - PLACE_RADIUS,
                          point.y - PLACE_RADIUS,
                          point.x + PLACE_RADIUS,
@@ -1496,56 +1574,7 @@ class BasicPNEditor(Tkinter.Canvas):
         self.scale(item, point.x, point.y, self._current_scale, self._current_scale)
         return item
     
-    def _set_create_place_entry(self, canvas_id, p):
-        """Sets the Entry Widget used to set the name of a new place.
-            
-            Calls the label callback factory function to bind the callback 
-            to the <KeyPress-Return> event.
-        """
-        txtbox = Tkinter.Entry(self)
-        txtbox.insert(0, str(p))
-        txtbox.selection_range(0, Tkinter.END)
-        #extra padding because entry position refers to the center, not the corner
-        label_padding = PLACE_LABEL_PADDING + 10
-        
-        txtbox_id = self.create_window(p.position.x, p.position.y + label_padding*self._current_scale, height= 20, width = 85, window = txtbox)
-        txtbox.grab_set()
-        txtbox.focus_set()
-        
-        callback = self._get_create_place_callback(txtbox, txtbox_id, canvas_id, p)
-        
-        escape_callback = self._get_cancel_create_callback(txtbox, txtbox_id, canvas_id, p)
-        
-        txtbox.bind('<KeyPress-Return>', callback)
-        txtbox.bind('<KeyPress-Escape>', escape_callback)
-    
-    def _set_create_transition_entry(self, canvas_id, t):
-        """Sets the Entry Widget used to set the name of a new transition.
-            
-            Calls the label callback factory function to bind the callback 
-            to the <KeyPress-Return> event.
-        """
-        txtbox = Tkinter.Entry(self)
-        txtbox.insert(0, str(t))
-        txtbox.selection_range(0, Tkinter.END)
-        #extra padding because entry position refers to the center, not the corner
-        if t.isHorizontal:
-            label_padding = TRANSITION_HORIZONTAL_LABEL_PADDING + 10
-        else:
-            label_padding = TRANSITION_VERTICAL_LABEL_PADDING + 10
-        
-        txtbox_id = self.create_window(t.position.x, t.position.y + label_padding*self._current_scale, height= 20, width = 85, window = txtbox)
-        txtbox.grab_set()
-        txtbox.focus_set()
-        
-        callback = self._get_create_transition_callback(txtbox, txtbox_id, canvas_id, t)
-        
-        escape_callback = self._get_cancel_create_callback(txtbox, txtbox_id, canvas_id, t)
-        
-        txtbox.bind('<KeyPress-Return>', callback)
-        txtbox.bind('<KeyPress-Escape>', escape_callback)
-    
-    def _get_create_place_callback(self, txtbox, txtbox_id, canvas_id, p):
+    def _get_create_place_callback(self, txtbox, txtbox_id, canvas_id, p, afterFunction = None):
         """Callback factory function for the <KeyPress-Return> event of the 'create place' entry widget."""
         def txtboxCallback(event):
             txt = txtbox.get()
@@ -1559,6 +1588,7 @@ class BasicPNEditor(Tkinter.Canvas):
             label_padding = PLACE_LABEL_PADDING
             
             self._petri_net.add_place(p)
+            self._add_to_undo(['create_place', 'Create Place.', p, Vec2(self._offset), self._current_scale])
             
             self.addtag_withtag('place_' + repr(p), canvas_id)
             tags = ('label',) + self.gettags(canvas_id)
@@ -1568,12 +1598,15 @@ class BasicPNEditor(Tkinter.Canvas):
                              tags=tags,
                              font = self.text_font )
             
-            self._add_to_undo(['create_place', 'Create Place.', p, Vec2(self._offset), self._current_scale])
             self.edited = True
             txtbox.grab_release()
             txtbox.destroy()
             self.focus_set()
             self.delete(txtbox_id)
+            
+            if afterFunction:
+                afterFunction(p)
+            
         return txtboxCallback
     
     def _get_create_transition_callback(self, txtbox, txtbox_id, canvas_id, t):
@@ -1610,66 +1643,19 @@ class BasicPNEditor(Tkinter.Canvas):
             self.delete(txtbox_id)
         return txtboxCallback
     
-    def _get_cancel_create_callback(self, txtbox, txtbox_id, canvas_id, obj):
+    def _get_cancel_create_callback(self, txtbox, txtbox_id, canvas_id, obj, afterCancelFunction = None):
         """Callback factory function for the <KeyPress-Escape> event of the 'create' entry widget."""
         def escape_callback(event):
+            
+            if afterCancelFunction:
+                afterCancelFunction()
+            
             txtbox.grab_release()
             txtbox.destroy()
             self.focus_set()
             self.delete(txtbox_id)
             self.delete(canvas_id)
         return escape_callback
-    
-    def _set_rename_place_entry(self, canvas_id, p):
-        """Sets the Entry Widget used to set the new name of a place.
-            
-            Calls the callback factory functions to bind the callbacks 
-            to the <KeyPress-Return> and <KeyPress-Escape> events.
-        """
-        txtbox = Tkinter.Entry(self)
-        txtbox.insert(0, str(p))
-        txtbox.selection_range(0, Tkinter.END)
-        
-        #extra padding because entry position refers to the center, not the corner
-        label_padding = PLACE_LABEL_PADDING + 10
-        
-        txtbox_id = self.create_window(p.position.x, p.position.y + label_padding*self._current_scale, height= 20, width = 85, window = txtbox)
-        txtbox.grab_set()
-        txtbox.focus_set()
-        
-        callback = self._get_rename_place_callback(txtbox, txtbox_id, canvas_id, p)
-        
-        escape_callback = self._get_cancel_rename_place_callback(txtbox, txtbox_id, canvas_id, p)
-        
-        txtbox.bind('<KeyPress-Return>', callback)
-        txtbox.bind('<KeyPress-Escape>', escape_callback)
-    
-    def _set_rename_transition_entry(self, canvas_id, t):
-        """Sets the Entry Widget used to set the new name of a transition.
-            
-            Calls the callback factory functions to bind the callbacks 
-            to the <KeyPress-Return> and <KeyPress-Escape> events.
-        """
-        txtbox = Tkinter.Entry(self)
-        txtbox.insert(0, str(t))
-        txtbox.selection_range(0, Tkinter.END)
-        
-        #extra padding because entry position refers to the center, not the corner
-        if t.isHorizontal:
-            label_padding = TRANSITION_HORIZONTAL_LABEL_PADDING + 10
-        else:
-            label_padding = TRANSITION_VERTICAL_LABEL_PADDING + 10
-        
-        txtbox_id = self.create_window(t.position.x, t.position.y + label_padding*self._current_scale, height= 20, width = 85, window = txtbox)
-        txtbox.grab_set()
-        txtbox.focus_set()
-        
-        callback = self._get_rename_transition_callback(txtbox, txtbox_id, canvas_id, t)
-        
-        escape_callback = self._get_cancel_rename_transition_callback(txtbox, txtbox_id, canvas_id, t)
-        
-        txtbox.bind('<KeyPress-Return>', callback)
-        txtbox.bind('<KeyPress-Escape>', escape_callback)
     
     def _get_rename_place_callback(self, txtbox, txtbox_id, canvas_id, p):
         """Callback factory function for the <KeyPress-Return> event of the 'rename place' entry widget."""
@@ -2082,7 +2068,6 @@ class BasicPNEditor(Tkinter.Canvas):
         """
         
         self.focus_set()
-        
         self._left_click(event)
     
     def _left_click(self, event):
@@ -2090,21 +2075,47 @@ class BasicPNEditor(Tkinter.Canvas):
         if self._hide_menu():
             return
         
+        if self._left_click_handlers(event):
+            self._state = 'normal'
+    
+    def _left_click_handlers(self, event):
+        
         if self._state == 'normal':
             self._set_anchor(event)
-            return
+            return True
         
         #Prevent left click to trigger when cursor is outside of the workspace
         if event.x < 0 or event.y < 0:
-            return
+            return True
         
         if self._state == 'connecting_place':
             self._finish_connect_place(event)
-            return
+            return True
         
         if self._state == 'connecting_transition':
             self._finish_connect_transition(event)
+            return True
+    
+    def _escape(self, event):
+        
+        if self._hide_menu():
             return
+        
+        if self._state == 'normal':
+            return
+        
+        if self._escape_handlers(event):
+            self._state = 'normal'
+    
+    def _escape_handlers(self, event):
+        
+        if self._state == 'connecting_place':
+            self._finish_connect_place(event, True)
+            return True
+        
+        if self._state == 'connecting_transition':
+            self._finish_connect_transition(event, True)
+            return True
     
     def _set_anchor(self, event):
         """When in "normal" mode (see _left_click), determines whether a movable element or the
@@ -2138,7 +2149,7 @@ class BasicPNEditor(Tkinter.Canvas):
                     self._anchor_node = self._petri_net.transitions[t[11:]]
                     break
     
-    def _finish_connect_place(self, event):
+    def _finish_connect_place(self, event, canceled = None):
         self._state = 'normal'
         self.grab_release()
         self.itemconfig('place', state = Tkinter.NORMAL)
@@ -2148,6 +2159,12 @@ class BasicPNEditor(Tkinter.Canvas):
         
         self.unbind('<Motion>', self._connecting_place_fn_id)
         self.delete('connecting')
+        
+        if canceled:
+            self._connecting_inhibitor = False
+            self._connecting_double = False
+            return
+        
         item = self._get_current_item(event)
     
         if item and 'transition' in self.gettags(item):
@@ -2173,7 +2190,7 @@ class BasicPNEditor(Tkinter.Canvas):
         self._connecting_inhibitor = False
         self._connecting_double = False
     
-    def _finish_connect_transition(self, event):
+    def _finish_connect_transition(self, event, canceled = None):
         self._state = 'normal'
         self.grab_release()
         self.itemconfig('transition', state = Tkinter.NORMAL)
@@ -2183,6 +2200,12 @@ class BasicPNEditor(Tkinter.Canvas):
         
         self.unbind('<Motion>', self._connecting_transition_fn_id)
         self.delete('connecting')
+        
+        if canceled:
+            self._connecting_inhibitor = False
+            self._connecting_double = False
+            return
+        
         item = self._get_current_item(event)
     
         if item and 'place' in self.gettags(item):
@@ -2223,7 +2246,7 @@ class BasicPNEditor(Tkinter.Canvas):
             if self._grid:
                 self._grid_offset = (self._grid_offset + diff).int
                 self._draw_grid()
-        else:
+        elif self._anchor_tag != 'selection':
             self._anchor_node.position += diff
             self._moved_vec += diff
             self._draw_item_arcs(self._anchor_node)
@@ -2241,7 +2264,9 @@ class BasicPNEditor(Tkinter.Canvas):
         self.config(cursor = 'arrow')
         self._anchor_set = False
         
-        if self._anchor_tag != 'all' and (abs(self._moved_vec.x) > 2.0 or abs(self._moved_vec.y) > 2.0) :
+        if self._anchor_tag not in ['all', 'selection'] and \
+                (abs(self._moved_vec.x) > 2.0 or abs(self._moved_vec.y) > 2.0) :
+            
             self._add_to_undo(['move_node', 'Move.', self._anchor_node, Vec2(self._moved_vec), self._current_scale])
 
 class RegularPNEditor(BasicPNEditor):
@@ -2290,6 +2315,11 @@ class RegularPNEditor(BasicPNEditor):
         if dialog.value_set and arc.weight != int(dialog.input_var.get()):
             return int(dialog.input_var.get())
         return None
+
+class CreationCanceledException(Exception):
+    
+    def __init__(self):
+        self.message = 'Creation Canceled'
     
 class NonPrimitiveTaskPNEditor(RegularPNEditor):
     
@@ -2309,23 +2339,197 @@ class NonPrimitiveTaskPNEditor(RegularPNEditor):
         #Preconditions Transition
         self._menus_options_sets_dict['preconditions_operations'] = [
                                                                      ('Add Non-Primitive Task', self._add_non_primitive_task),
-                                                                     ('Add Primitive Task', self._add_non_primitive_task)
+                                                                     ('Add Primitive Task', self._add_primitive_task)
+                                                                    ]
+        self._menus_options_sets_dict['npt_operations'] = [
+                                                                     ('Add Non-Primitive Task', self._add_non_primitive_task_from_place),
+                                                                     ('Add Primitive Task', self._add_primitive_task_from_place)
                                                                     ]
         self._menus_dict[PreconditionsTransition.__name__] = ['preconditions_operations', 'generic_transition_properties', 'generic_transition_operations', 'generic_transition_connections']  # @UndefinedVariable
+        self._menus_dict[NonPrimitiveTaskPlace.__name__] = ['npt_operations', 'generic_place_properties', 'generic_place_operations', 'generic_place_connections']  # @UndefinedVariable
+    
+    def _left_click_handlers(self, event):
+        
+        if RegularPNEditor._left_click_handlers(self, event):
+            return True
+        
+        #Call other left_click handlers
+        
+        if self._state == 'adding_npt':
+            self._finish_adding_npt(event)
+            return True
+        
+        if self._state == 'adding_npt_from_place':
+            self._finish_adding_npt_from_place(event)
+            return True
+    
+    def _escape_handlers(self, event):
+        
+        if RegularPNEditor._escape_handlers(self, event):
+            return True
+        
+        if self._state == 'adding_npt':
+            self._finish_adding_npt(event, True)
+            return True
+        
+        if self._state == 'adding_npt_from_place':
+            self._finish_adding_npt_from_place(event, True)
+            return True
     
     def _add_non_primitive_task(self):
-        pass
+        
+        self._state = 'adding_npt'
+        self._anchor_set = True
+        self._anchor_tag = 'selection'
+        
+        #Create drawing of place
+        p_position = self._last_point
+        npt_id = self._draw_place_item(p_position, NonPrimitiveTaskPlace)
+        self.addtag_withtag('selection', npt_id)
+        
+        transition_id = self._get_transition_id(self._last_clicked_id)
+        
+        self._connecting_t = self._petri_net.transitions[transition_id]
+        
+        self._adding_npt_fn_id = self.bind('<Motion>', self._dragCallback, '+')
+        self._connecting_npt_fn_id = self.bind('<Motion>', self._connecting_npt, '+')
+    
+    def _add_non_primitive_task_from_place(self):
+        
+        self._state = 'adding_npt_from_place'
+        self._anchor_set = True
+        self._anchor_tag = 'selection'
+        
+        #Create drawings
+        t_position = self._last_point
+        p_position = t_position + Vec2(100, 0)
+        
+        place_vec = t_position - p_position
+        #trans_vec = -place_vec
+        #transition_point = self._find_intersection(t, trans_vec)
+        place_point = p_position + place_vec.unit*PLACE_RADIUS*self._current_scale
+        dummy_transition = SequenceTransition('dummy', t_position)
+        transition_point = self._find_intersection(dummy_transition, p_position)
+        
+        arc_id = self.create_line(transition_point.x,
+                     transition_point.y,
+                     place_point.x,
+                     place_point.y,
+                     tags = ['selection'],
+                     width = LINE_WIDTH,
+                     arrow= Tkinter.LAST,
+                     arrowshape = (10,12,5) )
+        
+        seqt_id = self._draw_transition_item(t_position, SequenceTransition)
+        npt_id = self._draw_place_item(p_position, NonPrimitiveTaskPlace)
+        
+        self.addtag_withtag('selection', seqt_id)
+        self.addtag_withtag('selection', npt_id)
+        self.addtag_withtag('selection', arc_id)
+        
+        place_id = self._get_place_id(self._last_clicked_id)
+        
+        self._connecting_p = self._petri_net.places[place_id]
+        
+        self._adding_npt_fn_id = self.bind('<Motion>', self._dragCallback, '+')
+        self._connecting_npt_fn_id = self.bind('<Motion>', self._connecting_npt_from_place, '+')
     
     def _add_primitive_task(self):
         pass
     
-    def _left_click(self, event):
+    def _add_primitive_task_from_place(self):
+        pass
+    
+    def _connecting_npt(self, event):
         
-        #Call other left_click handlers
+        self.delete('connecting_arc')
         
-        RegularPNEditor._left_click(self, event)
+        t = self._connecting_t
+        p_position = Vec2(event.x, event.y)
         
+        place_vec = t.position - p_position
+        place_point = p_position + place_vec.unit*PLACE_RADIUS*self._current_scale
+        transition_point = self._find_intersection(t, p_position)
         
+        self.create_line(transition_point.x,
+                     transition_point.y,
+                     place_point.x,
+                     place_point.y,
+                     tags = ['connecting_arc'],
+                     width = LINE_WIDTH,
+                     arrow= Tkinter.LAST,
+                     arrowshape = (10,12,5) )
+    
+    def _connecting_npt_from_place(self, event):
+        
+        self.delete('connecting_arc')
+        
+        dummy_t = SequenceTransition('dummy', Vec2(event.x, event.y))
+        p = self._connecting_p
+        
+        place_vec = dummy_t.position - p.position
+        place_point = p.position + place_vec.unit*PLACE_RADIUS*self._current_scale
+        transition_point = self._find_intersection(dummy_t, p.position)
+        
+        self.create_line(place_point.x,
+                     place_point.y,
+                     transition_point.x,
+                     transition_point.y,
+                     tags = ['connecting_arc'],
+                     width = LINE_WIDTH,
+                     arrow= Tkinter.LAST,
+                     arrowshape = (10,12,5) )
+    
+    def _finish_adding_npt(self, event, canceled = None):
+        
+        try:
+            if canceled:
+                raise CreationCanceledException()
+            self._create_place(NonPrimitiveTaskPlace, afterFunction = self._add_npt_arc, afterCancelFunction = self._cancel_npt)
+        except CreationCanceledException:
+            self.delete('selection')
+            self.delete('connecting_arc')
+        except Exception as e:
+            tkMessageBox.showerror('Creation Error', str(e))
+        finally:
+            self.unbind('<Motion>', self._connecting_npt_fn_id)
+            self.unbind('<Motion>', self._adding_npt_fn_id)
+    
+    def _finish_adding_npt_from_place(self, event, canceled = None):
+        
+        try:
+            if canceled:
+                raise CreationCanceledException()
+            self._create_place(NonPrimitiveTaskPlace, point = self._last_point + Vec2(100, 0), afterFunction = self._add_npt_arc_from_place, afterCancelFunction = self._cancel_npt)
+        except CreationCanceledException:
+            self.delete('selection')
+            self.delete('connecting_arc')
+        except Exception as e:
+            tkMessageBox.showerror('Creation Error', str(e))
+        finally:
+            self.unbind('<Motion>', self._connecting_npt_fn_id)
+            self.unbind('<Motion>', self._adding_npt_fn_id)
+    
+    def _add_npt_arc(self, p):
+        self.delete('selection')
+        self.delete('connecting_arc')
+        self.add_arc(self._connecting_t, p)
+    
+    def _add_npt_arc_from_place(self, p):
+        self.delete('selection')
+        self.delete('connecting_arc')
+        
+        #create both arcs and transition
+        t = SequenceTransition('SeqT{}'.format(self._petri_net._transition_counter + 1), self._last_point)
+        self.add_transition(t)
+        self.add_arc(t, p)
+        self.add_arc(self._connecting_p, t)
+        
+    
+    def _cancel_npt(self):
+        self.delete('selection')
+        self.delete('connecting_arc')
+    
 class PrimitiveTaskPNEditor(BasicPNEditor):
     
     def __init__(self, parent, *args, **kwargs):
