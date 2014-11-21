@@ -17,6 +17,11 @@ from settings import *
 from utils import Vec2
 from auxdialogs import PositiveIntDialog, NonNegativeFloatDialog, NonNegativeIntDialog
 
+class CreationCanceledException(Exception):
+    
+    def __init__(self):
+        self.message = 'Creation Canceled'
+
 class BasicPNEditor(Tkinter.Canvas):
     """
     Tk widget for editing Petri Net diagrams.
@@ -2326,11 +2331,6 @@ class RegularPNEditor(BasicPNEditor):
         if dialog.value_set and arc.weight != int(dialog.input_var.get()):
             return int(dialog.input_var.get())
         return None
-
-class CreationCanceledException(Exception):
-    
-    def __init__(self):
-        self.message = 'Creation Canceled'
     
 class NonPrimitiveTaskPNEditor(RegularPNEditor):
     
@@ -2347,20 +2347,25 @@ class NonPrimitiveTaskPNEditor(RegularPNEditor):
         
         #ADD NonPrimitiveTaskPNEditor options
         
+        self._menus_options_sets_dict['preconditions_operations'] = [
+                                                             ('Add Fact Precondition', self._add_fact_precondition),
+                                                             ('Add NEGATAED Fact Precondition', self._add_negated_fact),
+                                                             ('Add Structured Fact Precondition', self._add_structured_fact),
+                                                             ('Add NEGATED Structured Fact Precondition', self._add_negated_structured_fact),
+                                                             ('Add OR Precondition', self._add_or),
+                                                             ('Add NOR Precondition', self._add_nor)
+                                                            ]
         self._menus_options_sets_dict['fact_operations'] = [
                                                              ('Add Fact', self._add_fact),
-                                                             ('Add NEGATAED Fact', self._add_negated_fact),
-                                                             ('Add Structured Fact', self._add_structured_fact),
-                                                             ('Add NEGATED Structured Fact', self._add_negated_structured_fact),
-                                                             ('Add OR', self._add_or),
-                                                             ('Add NOR', self._add_nor)
+                                                             ('Add Structured Fact', self._add_structured_fact)
                                                             ]
         
         self._menus_options_sets_dict['task_operations'] = [
-                                                                     ('Add Non-Primitive Task', self._add_non_primitive_task),
-                                                                     ('Add Primitive Task', self._add_primitive_task)
-                                                                    ]
-        self._menus_dict[PreconditionsTransition.__name__] = ['fact_operations', 'task_operations', 'generic_transition_properties', 'generic_transition_operations', 'generic_transition_connections']  # @UndefinedVariable
+                                                             ('Add Non-Primitive Task', self._add_non_primitive_task),
+                                                             ('Add Primitive Task', self._add_primitive_task)
+                                                            ]
+        self._menus_dict[PreconditionsTransition.__name__] = ['preconditions_operations', 'fact_operations', 'task_operations', 'generic_transition_properties', 'generic_transition_operations', 'generic_transition_connections']  # @UndefinedVariable
+        self._menus_dict[AndTransition.__name__] = ['preconditions_operations', 'generic_transition_properties', 'generic_transition_operations', 'generic_transition_connections']  # @UndefinedVariable
         self._menus_dict[SequenceTransition.__name__] = ['task_operations', 'generic_transition_properties', 'generic_transition_operations', 'generic_transition_connections']  # @UndefinedVariable
         self._menus_dict[NonPrimitiveTaskPlace.__name__] = ['generic_place_properties', 'generic_place_operations', 'generic_place_connections']  # @UndefinedVariable
         self._menus_dict[PrimitiveTaskPlace.__name__] = ['generic_place_properties', 'generic_place_operations', 'generic_place_connections']  # @UndefinedVariable
@@ -2376,12 +2381,16 @@ class NonPrimitiveTaskPNEditor(RegularPNEditor):
             self._finish_adding_task(event)
             return True
         
-        if self._state == 'adding_fact':
-            self._finish_adding_fact(event)
+        if self._state == 'adding_fact_precondition':
+            self._finish_adding_fact_precondition(event)
             return True
         
         if self._state == 'adding_negated_fact':
             self._finish_adding_negated_fact(event)
+            return True
+        
+        if self._state == 'adding_fact':
+            self._finish_adding_fact(event)
             return True
         
         if self._state == 'adding_or':
@@ -2401,12 +2410,16 @@ class NonPrimitiveTaskPNEditor(RegularPNEditor):
             self._finish_adding_task(event, True)
             return True
         
-        if self._state == 'adding_fact':
-            self._finish_adding_fact(event, True)
+        if self._state == 'adding_fact_precondition':
+            self._finish_adding_fact_precondition(event, True)
             return True
         
         if self._state == 'adding_negated_fact':
             self._finish_adding_negated_fact(event, True)
+            return True
+        
+        if self._state == 'adding_fact':
+            self._finish_adding_fact(event, True)
             return True
         
         if self._state == 'adding_or':
@@ -2461,6 +2474,30 @@ class NonPrimitiveTaskPNEditor(RegularPNEditor):
         self._adding_place_fn_id = self.bind('<Motion>', self._dragCallback, '+')
         self._connecting_place_fn_id = self.bind('<Motion>', self._connecting_transition_to_place, '+')
     
+    def _add_fact_precondition(self):
+        self._add_fact_place_precondition(FactPlace)
+    
+    def _add_structured_fact_precondition(self):
+        self._add_fact_place_precondition(StructuredFactPlace)
+        
+    def _add_fact_place_precondition(self, PlaceClass):
+        self._state = 'adding_fact_precondition'
+        self._anchor_set = True
+        self._anchor_tag = 'selection'
+        
+        #Create drawing of place
+        p_position = self._last_point
+        fact_id = self._draw_place_item(p_position, PlaceClass)
+        self.addtag_withtag('selection', fact_id)
+        
+        transition_id = self._get_transition_id(self._last_clicked_id)
+        
+        self._connecting_t = self._petri_net.transitions[transition_id]
+        self._place_class = PlaceClass
+        
+        self._adding_place_fn_id = self.bind('<Motion>', self._dragCallback, '+')
+        self._connecting_place_fn_id = self.bind('<Motion>', self._connecting_place_to_transition, '+')
+    
     def _add_fact(self):
         self._add_fact_place(FactPlace)
     
@@ -2483,7 +2520,7 @@ class NonPrimitiveTaskPNEditor(RegularPNEditor):
         self._place_class = PlaceClass
         
         self._adding_place_fn_id = self.bind('<Motion>', self._dragCallback, '+')
-        self._connecting_place_fn_id = self.bind('<Motion>', self._connecting_place_to_transition, '+')
+        self._connecting_place_fn_id = self.bind('<Motion>', self._connecting_transition_to_place, '+')
     
     def _add_negated_fact(self):
         self._add_negated_fact_place(FactPlace)
@@ -2625,7 +2662,6 @@ class NonPrimitiveTaskPNEditor(RegularPNEditor):
         self.addtag_withtag('selection', arc2_id)
         self.addtag_withtag('selection', label_id)
         
-        
         transition_id = self._get_transition_id(self._last_clicked_id)
         self._connecting_t = self._petri_net.transitions[transition_id]
         
@@ -2725,11 +2761,11 @@ class NonPrimitiveTaskPNEditor(RegularPNEditor):
             self.unbind('<Motion>', self._connecting_place_fn_id)
             self.unbind('<Motion>', self._adding_place_fn_id)
     
-    def _finish_adding_fact(self, event, canceled = None):
+    def _finish_adding_fact_precondition(self, event, canceled = None):
         try:
             if canceled:
                 raise CreationCanceledException()
-            self._create_place(self._place_class, afterFunction = self._add_fact_arc, afterCancelFunction = self._cancel_create_place)
+            self._create_place(self._place_class, afterFunction = self._add_fact_precondition_arc, afterCancelFunction = self._cancel_create_place)
         except CreationCanceledException:
             self.delete('selection')
             self.delete('connecting_arc')
@@ -2744,6 +2780,20 @@ class NonPrimitiveTaskPNEditor(RegularPNEditor):
             if canceled:
                 raise CreationCanceledException()
             self._create_place(self._place_class, afterFunction = self._add_negated_fact_arc, afterCancelFunction = self._cancel_create_place)
+        except CreationCanceledException:
+            self.delete('selection')
+            self.delete('connecting_arc')
+        except Exception as e:
+            tkMessageBox.showerror('Creation Error', str(e))
+        finally:
+            self.unbind('<Motion>', self._connecting_place_fn_id)
+            self.unbind('<Motion>', self._adding_place_fn_id)
+    
+    def _finish_adding_fact(self, event, canceled = None):
+        try:
+            if canceled:
+                raise CreationCanceledException()
+            self._create_place(self._place_class, afterFunction = self._add_fact_arc, afterCancelFunction = self._cancel_create_place)
         except CreationCanceledException:
             self.delete('selection')
             self.delete('connecting_arc')
@@ -2827,7 +2877,7 @@ class NonPrimitiveTaskPNEditor(RegularPNEditor):
         self.add_arc(t, p)
         self.add_arc(self._connecting_p, t)
     
-    def _add_fact_arc(self, p):
+    def _add_fact_precondition_arc(self, p):
         self.delete('selection')
         self.delete('connecting_arc')
         self.add_arc(p, self._connecting_t)
@@ -2836,6 +2886,11 @@ class NonPrimitiveTaskPNEditor(RegularPNEditor):
         self.delete('selection')
         self.delete('connecting_arc')
         self.add_arc(p, self._connecting_t, 0)
+    
+    def _add_fact_arc(self, p):
+        self.delete('selection')
+        self.delete('connecting_arc')
+        self.add_arc(self._connecting_t, p)
     
     def _cancel_create_place(self):
         self.delete('selection')
