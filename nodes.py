@@ -650,8 +650,8 @@ class RuleTransition(Transition):
     
 class AndTransition(Transition):
     
-    FILL_COLOR = '#CC88FF'
-    OUTLINE_COLOR = '#AA66DD'
+    FILL_COLOR = '#444444'
+    OUTLINE_COLOR = '#444444'
     PREFIX = 'and'
     
     def __init__(self, name, position = Vec2(), isHorizontal = False, rate = 1.0, priority = 1):

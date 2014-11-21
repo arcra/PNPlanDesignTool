@@ -465,7 +465,6 @@ class NonPrimitiveTaskPN(BasicPetriNet):
     def add_arc(self, source, target, weight = 1, _treeElement = None):
         
         #Assert
-        
         if isinstance(target, SequenceTransition) and len(target._incoming_arcs) > 0:
             raise Exception('A Sequence Transition cannot have more than one tasks connected to it.\n\
             If synchronization is needed, two hierarchy levels must be created.')
