@@ -61,7 +61,10 @@ class TabManager(ttk.Notebook):
     def btn_press(self, event):
         x, y = event.x, event.y
         elem = self.identify(x, y)
-        index = self.index("@%d,%d" % (x, y))
+        try:
+            index = self.index("@%d,%d" % (x, y))
+        except:
+            return
     
         if "close" in elem:
             self.state(['pressed'])
