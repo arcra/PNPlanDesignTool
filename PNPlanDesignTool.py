@@ -18,13 +18,14 @@ from gui.tabmanager import TabManager
 from gui.pneditors import RegularPNEditor, NonPrimitiveTaskPNEditor,\
     PrimitiveTaskPNEditor, FinalizingPNEditor, CancelingPNEditor
 from gui.auxdialogs import InputDialog
+from nodes import FactPlace
 
 class PNPDT(object):
     
     WORKSPACE_WIDTH = 600
     WORKSPACE_HEIGHT = 600
     
-    EXPLORER_WIDTH = 250
+    EXPLORER_WIDTH = 400
     
     def __init__(self):
         super(PNPDT, self).__init__()
@@ -34,36 +35,22 @@ class PNPDT(object):
         self.root.protocol("WM_DELETE_WINDOW", self.exit)
         #Necessary in order for the children to expand to the real size of the window if resized:
         self.root.rowconfigure(1, weight = 1)
-        self.root.columnconfigure(2, weight = 1)
+        self.root.columnconfigure(0, weight = 1)
+        self.root.columnconfigure(2, weight = 4)
         
-        toolbar_frame = tk.Frame(self.root)
-        toolbar_frame.grid(row = 0, column = 2, sticky = tk.E)
-        
-        '''
-        mode_label = tk.Label(toolbar_frame, text = 'mode: ')
-        mode_label.grid(row = 0, column = 0, sticky = tk.E)
-        
-        self.mode_var = tk.StringVar()
-        mode_combo = ttk.Combobox(toolbar_frame,
-                                  values = ['Editor', 'Simulation', 'Execution'],
-                                  textvariable = self.mode_var,
-                                  state = 'readonly')
-        self.mode_var.set('Editor')
-        mode_combo.grid(row = 0, column = 1, sticky = tk.E)
-        '''
-        
-        project_frame = tk.Frame(self.root, width = PNPDT.EXPLORER_WIDTH)
-        project_frame.grid(row = 1, column = 0, sticky = tk.NSEW)
-        project_frame.rowconfigure(0, weight = 1)
+        self.project_frame = tk.Frame(self.root, width = PNPDT.EXPLORER_WIDTH)
+        self.project_frame.grid(row = 1, column = 0, sticky = tk.NSEW)
+        self.project_frame.rowconfigure(0, weight = 1)
+        self.project_frame.columnconfigure(0, weight = 1)
         
         sep = ttk.Separator(self.root, orient = tk.VERTICAL)
         sep.grid(row = 1, column = 1, sticky = tk.NS)
         
-        workspace_frame = tk.Frame(self.root, width = PNPDT.WORKSPACE_WIDTH, height = PNPDT.WORKSPACE_HEIGHT)
-        workspace_frame.grid(row = 1, column = 2, sticky = tk.NSEW)
+        self.workspace_frame = tk.Frame(self.root, width = PNPDT.WORKSPACE_WIDTH, height = PNPDT.WORKSPACE_HEIGHT)
+        self.workspace_frame.grid(row = 1, column = 2, sticky = tk.NSEW)
         #Necessary in order for the children to expand to the real size of the window if resized:
-        workspace_frame.rowconfigure(0, weight = 1)
-        workspace_frame.columnconfigure(0, weight = 1)
+        self.workspace_frame.rowconfigure(0, weight = 1)
+        self.workspace_frame.columnconfigure(0, weight = 1)
         
         self.status_bar = tk.Frame(self.root, height = 20)
         self.status_bar.grid(row = 2, columnspan=3, sticky = tk.EW)
@@ -74,12 +61,12 @@ class PNPDT(object):
         self.status_label = tk.Label(self.status_bar, textvariable = self.status_var)
         self.status_label.grid(row = 0, column = 0, sticky = tk.EW)
         
-        self.project_tree = ttk.Treeview(project_frame, height = int((PNPDT.WORKSPACE_HEIGHT - 20)/20), selectmode = 'browse')
+        self.project_tree = ttk.Treeview(self.project_frame, height = int((PNPDT.WORKSPACE_HEIGHT - 20)/20), selectmode = 'browse')
         self.project_tree.heading('#0', text='Project Explorer', anchor=tk.W)
         self.project_tree.grid(row = 0, column = 0, sticky = tk.NSEW)
         
         #ysb = ttk.Scrollbar(project_frame, orient='vertical', command=self.project_tree.yview)
-        xsb = ttk.Scrollbar(project_frame, orient='horizontal', command=self.project_tree.xview)
+        xsb = ttk.Scrollbar(self.project_frame, orient='horizontal', command=self.project_tree.xview)
         self.project_tree.configure(xscroll = xsb.set)#, yscroll = ysb.set)
         #ysb.grid(row = 0, column = 1, sticky = tk.NS)
         xsb.grid(row = 1, column = 0, sticky = tk.EW)
@@ -93,7 +80,7 @@ class PNPDT(object):
         self.project_tree.insert('', 'end', 'Primitive_Actions/', text = 'Primitive Actions', tags = ['folder', 'primitive_action', 'top_level'], open = True)
         self.project_tree.insert('', 'end', 'Non_Primitive_Actions/', text = 'Non-Primitive Actions', tags = ['folder', 'non_primitive_action', 'top_level'], open = True)
         
-        self.tab_manager = TabManager(workspace_frame,
+        self.tab_manager = TabManager(self.workspace_frame,
                                      width = PNPDT.WORKSPACE_WIDTH,
                                      height = PNPDT.WORKSPACE_HEIGHT)
         self.tab_manager.grid(row = 0, column = 0, sticky = tk.NSEW)
@@ -285,7 +272,9 @@ class PNPDT(object):
             dialog = InputDialog('Task name',
                                  'Please input a Task name, preferably composed only of alphanumeric characters.',
                                  'Name',
-                                 entry_length = 25)
+                                 entry_length = 25,
+                                 regex = FactPlace.REGEX
+                                 )
             dialog.window.transient(self.root)
             self.root.wait_window(dialog.window)
             if not dialog.value_set:
@@ -379,9 +368,11 @@ class PNPDT(object):
             tkMessageBox.showerror('ERROR', str(e))
             return
             
+        try:
             self.project_tree.insert(self.clicked_element, 'end', item_id, text = name, tags = item_tags)
             self._adjust_width(name, item_id)
         except Exception as e:
+            del self.petri_nets[item_id]
             tkMessageBox.showerror('ERROR', 'The Petri Net could not be inserted in the selected node, possible duplicate name.\n\n' + str(e))
             return
     

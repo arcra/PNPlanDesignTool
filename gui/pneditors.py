@@ -2364,11 +2364,17 @@ class NonPrimitiveTaskPNEditor(RegularPNEditor):
                                                              ('Add Non-Primitive Task', self._add_non_primitive_task),
                                                              ('Add Primitive Task', self._add_primitive_task)
                                                             ]
-        self._menus_dict[PreconditionsTransition.__name__] = ['preconditions_operations', 'fact_operations', 'task_operations', 'generic_transition_properties', 'generic_transition_operations', 'generic_transition_connections']  # @UndefinedVariable
+        self._menus_options_sets_dict['or_operations'] = [
+                                                             ('Add Transition', self._add_transition)
+                                                            ]
+        self._menus_dict[PreconditionsTransition.__name__] = ['preconditions_operations', 'fact_operations', 'task_operations', 'generic_transition_properties', 'generic_transition_connections']  # @UndefinedVariable
         self._menus_dict[AndTransition.__name__] = ['preconditions_operations', 'generic_transition_properties', 'generic_transition_operations', 'generic_transition_connections']  # @UndefinedVariable
         self._menus_dict[SequenceTransition.__name__] = ['task_operations', 'generic_transition_properties', 'generic_transition_operations', 'generic_transition_connections']  # @UndefinedVariable
         self._menus_dict[NonPrimitiveTaskPlace.__name__] = ['generic_place_properties', 'generic_place_operations', 'generic_place_connections']  # @UndefinedVariable
         self._menus_dict[PrimitiveTaskPlace.__name__] = ['generic_place_properties', 'generic_place_operations', 'generic_place_connections']  # @UndefinedVariable
+        self._menus_dict[FactPlace.__name__] = ['generic_place_properties', 'generic_place_operations', 'generic_place_connections']  # @UndefinedVariable
+        self._menus_dict[StructuredFactPlace.__name__] = ['generic_place_properties', 'generic_place_operations', 'generic_place_connections']  # @UndefinedVariable
+        self._menus_dict[OrPlace.__name__] = ['or_operations', 'generic_place_operations']  # @UndefinedVariable
     
     def _left_click_handlers(self, event):
         
@@ -2400,6 +2406,10 @@ class NonPrimitiveTaskPNEditor(RegularPNEditor):
         if self._state == 'adding_nor':
             self._finish_adding_nor(event)
             return True
+        
+        if self._state == 'adding_transition':
+            self._finish_adding_transition(event)
+            return True
     
     def _escape_handlers(self, event):
         
@@ -2428,6 +2438,10 @@ class NonPrimitiveTaskPNEditor(RegularPNEditor):
         
         if self._state == 'adding_nor':
             self._finish_adding_nor(event, True)
+            return True
+        
+        if self._state == 'adding_transition':
+            self._finish_adding_transition(event, True)
             return True
     
     def _add_non_primitive_task(self):
@@ -2668,6 +2682,21 @@ class NonPrimitiveTaskPNEditor(RegularPNEditor):
         self._adding_place_fn_id = self.bind('<Motion>', self._dragCallback, '+')
         self._connecting_place_fn_id = self.bind('<Motion>', self._connecting_negated_place_to_transition, '+')
     
+    def _add_transition(self):
+        self._state = 'adding_transition'
+        self._anchor_set = True
+        self._anchor_tag = 'selection'
+        
+        #Create drawings (selection)
+        t_id = self._draw_transition_item(self._last_point, AndTransition)
+        self.addtag_withtag('selection', t_id)
+        
+        place_id = self._get_place_id(self._last_clicked_id)
+        self._connecting_p = self._petri_net.places[place_id]
+        
+        self._adding_transition_fn_id = self.bind('<Motion>', self._dragCallback, '+')
+        self._connecting_transition_fn_id = self.bind('<Motion>', self._connecting_transition_to_or_place, '+')
+    
     def _connecting_transition_to_place(self, event):
         
         self.delete('connecting_arc')
@@ -2678,6 +2707,27 @@ class NonPrimitiveTaskPNEditor(RegularPNEditor):
         place_vec = t.position - p_position
         place_point = p_position + place_vec.unit*PLACE_RADIUS*self._current_scale
         transition_point = self._find_intersection(t, p_position)
+        
+        self.create_line(transition_point.x,
+                     transition_point.y,
+                     place_point.x,
+                     place_point.y,
+                     tags = ['connecting_arc'],
+                     width = LINE_WIDTH,
+                     arrow= Tkinter.LAST,
+                     arrowshape = (10,12,5) )
+    
+    def _connecting_transition_to_or_place(self, event):
+        
+        self.delete('connecting_arc')
+        
+        t_position = Vec2(event.x, event.y)
+        dummy_transition = AndTransition('dummy', t_position)
+        p = self._connecting_p
+        
+        place_vec = t_position - p.position
+        place_point = p.position + place_vec.unit*PLACE_RADIUS*self._current_scale
+        transition_point = self._find_intersection(dummy_transition, p.position)
         
         self.create_line(transition_point.x,
                      transition_point.y,
@@ -2856,6 +2906,31 @@ class NonPrimitiveTaskPNEditor(RegularPNEditor):
         finally:
             self.unbind('<Motion>', self._connecting_place_fn_id)
             self.unbind('<Motion>', self._adding_place_fn_id)
+    
+    def _finish_adding_transition(self, event, canceled = None):
+        try:
+            if canceled:
+                raise CreationCanceledException()
+            
+            self.delete('selection')
+            self.delete('connecting_arc')
+            
+            p = self._connecting_p
+            t_position = Vec2(event.x, event.y)
+            
+            t = AndTransition('AndT{0}'.format(self._petri_net._transition_counter + 1), t_position)
+            
+            self.add_transition(t)
+            self.add_arc(t, p)
+            
+        except CreationCanceledException:
+            self.delete('selection')
+            self.delete('connecting_arc')
+        except Exception as e:
+            tkMessageBox.showerror('Creation Error', str(e))
+        finally:
+            self.unbind('<Motion>', self._connecting_transition_fn_id)
+            self.unbind('<Motion>', self._adding_transition_fn_id)
     
     def _add_task_arc(self, p):
         self.delete('selection')

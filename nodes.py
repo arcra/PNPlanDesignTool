@@ -5,6 +5,7 @@
 
 import abc
 import copy
+import re
 import lxml.etree as ET
 
 from utils import Vec2
@@ -60,7 +61,7 @@ class Node(object):
     def name(self, value):
         """Sets the name of the node. Throws an exception if name is None or an empty string."""
         
-        self.validate_name(value)
+        self._validate_name(value)
         
         self._name = value
     
@@ -69,7 +70,7 @@ class Node(object):
         """Returns the name of the node, with its class prefix."""
         return self.PREFIX + '.' + self._name
     
-    def validate_name(self, val):
+    def _validate_name(self, val):
         
         if not val:
             raise Exception('A Node name must be a non-empty string.')
@@ -334,6 +335,8 @@ class FactPlace(Place):
     OUTLINE_COLOR = '#0000BB'
     PREFIX = 'fact'
     
+    REGEX = re.compile(r'[a-zA-Z][a-zA-Z0-9_-]*\s*(\(\s*((\??([a-zA-Z][a-zA-Z0-9_-]*)?)|("[^"]*"))(\s*,\s*((\??([a-zA-Z][a-zA-Z0-9_-]*)?)|("[^"]*")))*\s*\))?')
+    
     def __init__(self, name, position=Vec2(), init_marking=0, capacity=1):
         super(FactPlace, self).__init__(name, position=position, init_marking=init_marking, capacity=capacity)
     
@@ -378,9 +381,18 @@ class TaskStatusPlace(Place):
     FILL_COLOR = '#00EE00'
     OUTLINE_COLOR = '#00AA00'
     PREFIX = 'ts'
+    REGEX = re.compile(r'task_status\(successful|failed|\?|\?[a-z-A-Z][a-z-A-Z0-9_-]*\)')
     
     def __init__(self, name, position=Vec2(), init_marking=0, capacity=1):
         super(TaskStatusPlace, self).__init__(name, position=position, init_marking=init_marking, capacity=capacity)
+    
+    def _validate_name(self, val):
+        
+        super(TaskStatusPlace, self)._validate_name(val)
+        
+        #Assert
+        if not self.REGEX.match(val):
+            raise Exception("A Task Status Place should have as parameter either one of the constants 'successful' and 'failed', or a variable.")
     
     def can_connect_to(self, target, weight):
         super(TaskStatusPlace, self).can_connect_to(target, weight)

@@ -10,7 +10,7 @@ import os
 import lxml.etree as ET
 
 from nodes import Place, Transition, PreconditionsTransition, _Arc, _get_treeElement,\
-    RuleTransition, SequenceTransition
+    RuleTransition, SequenceTransition, TaskStatusPlace
 from utils import Vec2
 
 class BasicPetriNet(object):
@@ -63,7 +63,7 @@ class BasicPetriNet(object):
         
     
     def _initialize(self):
-        self.add_transition(RuleTransition(self.name, Vec2(300, 300)))
+        self.add_transition(RuleTransition('Rule', Vec2(180, 300)))
     
     def add_place(self, p):
         """Adds a place from the Petri Net.
@@ -456,7 +456,7 @@ class NonPrimitiveTaskPN(BasicPetriNet):
         super(NonPrimitiveTaskPN, self).__init__(name, task, _net)
     
     def _initialize(self):
-        self.add_transition(PreconditionsTransition(self.name, Vec2(180, 300)))
+        self.add_transition(PreconditionsTransition('Preconditions', Vec2(180, 300)))
     
     @classmethod
     def from_pnml_file(cls, filename):
@@ -486,6 +486,14 @@ class FinalizingPN(BasicPetriNet):
     def __init__(self, name, task, _net = None):
         
         super(FinalizingPN, self).__init__(name, task, _net)
+    
+    def _initialize(self):
+        BasicPetriNet._initialize(self)
+        
+        t = self.transitions[self.name]
+        p = TaskStatusPlace('task_status(?)', t.position + Vec2(-50, 0))
+        self.add_place(p)
+        self.add_arc(p, t)
     
     @classmethod
     def from_pnml_file(cls, filename):
