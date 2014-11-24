@@ -378,10 +378,15 @@ class PNPDT(object):
     
     def rename_task(self):
         
+        old_id = self.clicked_element
+        old_name = old_id[old_id[:-1].rfind('/') + 1:-1]
+        
         dialog = InputDialog('Task name',
                                  'Please input a Task name, preferably composed only of alphanumeric characters.',
                                  'Name',
-                                 entry_length = 25)
+                                 entry_length = 25,
+                                 regex = FactPlace.REGEX,
+                                 value = old_name)
         dialog.window.transient(self.root)
         self.root.wait_window(dialog.window)
         if not dialog.value_set:
@@ -389,10 +394,10 @@ class PNPDT(object):
         
         name = dialog.input_var.get()
         
-        old_id = self.clicked_element
+        #Need to set it for the create_task call
         self.clicked_element = self.project_tree.parent(self.clicked_element)
-        
-        item_id = self.create_task(name)
+        is_primitive_action = 'primitive_action' in self.project_tree.item(self.clicked_element, 'tags')
+        item_id = self.create_task(name, is_primitive_action = is_primitive_action)
         if not item_id:
             return
         
@@ -402,8 +407,11 @@ class PNPDT(object):
             sub_id = subfolder[subfolder[:-1].rfind('/') + 1:]
             self.clicked_element = item_id + sub_id
             for pn_id in self.project_tree.get_children(old_id + sub_id):
-                pne = self.delete_petri_net(pn_id)
+                pne, tab_open = self.delete_petri_net(pn_id)
+                pne.set_pn_task(name)
                 self.create_petri_net(pne)
+                if tab_open:
+                    self.open_petri_net(pne)
         
         self.project_tree.delete(old_id)
     
@@ -411,8 +419,9 @@ class PNPDT(object):
         self.clicked_element = self.project_tree.identify('item', event.x, event.y)
         self.open_petri_net()
     
-    def open_petri_net(self):
-        pne = self.petri_nets[self.clicked_element]
+    def open_petri_net(self, pne = None):
+        if pne is None:
+            pne = self.petri_nets[self.clicked_element]
         try:
             self.tab_manager.add(pne, text = pne.name)
         except:
@@ -588,12 +597,13 @@ class PNPDT(object):
         if not item:
             item = self.clicked_element
         pne = self.petri_nets.pop(item, None)
+        tab_open = True
         try:
             self.tab_manager.forget(pne)
         except:
-            pass
+            tab_open = False
         self.project_tree.delete(item)
-        return pne
+        return pne, tab_open
     
     def export_to_PNML(self):
         filename = tkFileDialog.asksaveasfilename(
