@@ -293,8 +293,11 @@ class NonPrimitiveTaskPlace(Place):
     
     def can_connect_to(self, target, weight):
         super(NonPrimitiveTaskPlace, self).can_connect_to(target, weight)
-        if target.__class__ != SequenceTransition:
+        if target.__class__ not in [SequenceTransition, PreconditionsTransition, RuleTransition]:
             raise Exception('TASK places cannot connect to a transition that is not of type SEQUENCE.')
+        
+        if target.__class__ in [PreconditionsTransition, RuleTransition] and self.petri_net.task != self.name:
+            raise Exception('Only the NON-PRIMITIVE TASK Place corresponding to the task this rule belongs to is allowed to connect to a PRECONDITIONS or RULE Transition.')
         
         if weight == 0:
             raise Exception('TASK places cannot connect with an inhibitor arc (weight == 0).')

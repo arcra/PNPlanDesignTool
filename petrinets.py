@@ -10,7 +10,7 @@ import os
 import lxml.etree as ET
 
 from nodes import Place, Transition, PreconditionsTransition, _Arc, _get_treeElement,\
-    RuleTransition, SequenceTransition, TaskStatusPlace
+    RuleTransition, SequenceTransition, TaskStatusPlace, NonPrimitiveTaskPlace
 from utils import Vec2
 
 class BasicPetriNet(object):
@@ -30,7 +30,7 @@ class BasicPetriNet(object):
             raise Exception("PetriNet 'name' must be a non-empty string.")
         
         self.name = name
-        self.task = task
+        self._task = task
         self.places = {}
         self.transitions = {}
         self.scale = 1.0
@@ -39,6 +39,10 @@ class BasicPetriNet(object):
         self._transition_counter = 0
         
         self._initialize()
+        
+        p = NonPrimitiveTaskPlace(self.task, Vec2(150, 300))
+        self.add_place(p)
+        self.add_arc(p, self._main_transition)
         
         root_el = ET.Element('pnml', {'xmlns': 'http://www.pnml.org/version-2009/grammar/pnml'})
         self._tree = ET.ElementTree(root_el)
@@ -60,10 +64,30 @@ class BasicPetriNet(object):
         tmp.text = name
         if page is None:
             ET.SubElement(_net, 'page', {'id': 'PNLab_top_lvl'})
+    
+    @property
+    def task(self):
+        return self._task
+    
+    @task.setter
+    def task(self, val):
+        if not val:
+            raise Exception('Task name cannot be an empty string.')
         
+        for p in self.places.itervalues():
+            if p.name == self.task:
+                break
+        
+        if not p:
+            raise Exception('Parent Task Place was not found.')
+        
+        p.name = val
+        
+        self._task = val
     
     def _initialize(self):
-        self.add_transition(RuleTransition('Rule', Vec2(180, 300)))
+        self._main_transition = RuleTransition('Rule', Vec2(250, 300))
+        self.add_transition(self._main_transition)
     
     def add_place(self, p):
         """Adds a place from the Petri Net.
@@ -84,7 +108,7 @@ class BasicPetriNet(object):
         
         p.petri_net = self
     
-    def add_transition(self, t, overwrite = False):
+    def add_transition(self, t):
         """Adds a transition from the Petri Net.
         
         Clears the arcs from the transition object and adds it to the Petri Net.
@@ -452,11 +476,27 @@ class PetriNetTypes(object):
 class NonPrimitiveTaskPN(BasicPetriNet):
     
     def __init__(self, name, task, _net = None):
-        
         super(NonPrimitiveTaskPN, self).__init__(name, task, _net)
     
     def _initialize(self):
-        self.add_transition(PreconditionsTransition('Preconditions', Vec2(180, 300)))
+        self._main_transition = PreconditionsTransition('Preconditions', Vec2(350, 300))
+        self.add_transition(self._main_transition)
+    
+    '''
+    @BasicPetriNet.task.setter
+    def task(self, val):
+        
+        BasicPetriNet.task.setter(val)
+        
+        for p in self.places.itervalues():
+            if p.name == self.task:
+                break
+        
+        if not p:
+            raise Exception('Parent Task Place was not found.')
+        
+        p.name = val
+    '''
     
     @classmethod
     def from_pnml_file(cls, filename):
@@ -488,7 +528,8 @@ class FinalizingPN(BasicPetriNet):
         super(FinalizingPN, self).__init__(name, task, _net)
     
     def _initialize(self):
-        BasicPetriNet._initialize(self)
+        
+        super(FinalizingPN, self)._initialize()
         
         t = self.transitions[self.name]
         p = TaskStatusPlace('task_status(?)', t.position + Vec2(-50, 0))

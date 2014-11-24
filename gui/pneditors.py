@@ -725,6 +725,11 @@ class BasicPNEditor(Tkinter.Canvas):
         
         self._draw_petri_net()
     
+    def set_pn_task(self, val):
+        
+        self._petri_net.task = val
+        self._draw_petri_net()
+    
     def add_place(self, p):
         """Adds a place to the Petri Net and draws it.
         
