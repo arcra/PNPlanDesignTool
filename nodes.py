@@ -324,6 +324,7 @@ class CommandPlace(Place):
     FILL_COLOR = '#99FF66'
     OUTLINE_COLOR = '#77DD44'
     PREFIX = 'cmd'
+    REGEX = re.compile(r'[a-zA-Z][a-zA-Z0-9_-]*\s*\(\s*((\?[a-zA-Z][a-zA-Z0-9_-]*)|("[^"]*"))\s*,\s*((\?[a-zA-Z][a-zA-Z0-9_-]*)|("[^"]*"))(\s*,\s*((\?[a-zA-Z][a-zA-Z0-9_-]*)|([0-9]+))){,2}\s*\)')
     
     def __init__(self, name, position=Vec2(), init_marking=0, capacity=1):
         super(CommandPlace, self).__init__(name, position=position, init_marking=init_marking, capacity=capacity)
@@ -384,7 +385,7 @@ class TaskStatusPlace(Place):
     FILL_COLOR = '#00EE00'
     OUTLINE_COLOR = '#00AA00'
     PREFIX = 'ts'
-    REGEX = re.compile(r'task_status\(successful|failed|\?|\?[a-z-A-Z][a-z-A-Z0-9_-]*\)')
+    REGEX = re.compile(r'task_status\(((successful)|(failed)|(\?)|(\?[a-z-A-Z][a-z-A-Z0-9_-]*))\)')
     
     def __init__(self, name, position=Vec2(), init_marking=0, capacity=1):
         super(TaskStatusPlace, self).__init__(name, position=position, init_marking=init_marking, capacity=capacity)
@@ -399,7 +400,9 @@ class TaskStatusPlace(Place):
     
     def can_connect_to(self, target, weight):
         super(TaskStatusPlace, self).can_connect_to(target, weight)
-        raise Exception('TASK_STATUS places cannot connect to any transition.')
+        
+        if target.__class__ != RuleTransition:
+            raise Exception('TASK_STATUS places cannot connect to any transition other than a RULE Transition.')
 
 PLACE_CLASSES = (Place,
                  NonPrimitiveTaskPlace,
