@@ -10,7 +10,8 @@ import os
 import lxml.etree as ET
 
 from nodes import Place, Transition, PreconditionsTransition, _Arc, _get_treeElement,\
-    RuleTransition, SequenceTransition, TaskStatusPlace, NonPrimitiveTaskPlace
+    RuleTransition, SequenceTransition, TaskStatusPlace, NonPrimitiveTaskPlace,\
+    PrimitiveTaskPlace
 from utils import Vec2
 
 class BasicPetriNet(object):
@@ -21,7 +22,7 @@ class BasicPetriNet(object):
     saving is necessary before the object is destroyed.
     '''
     
-    def __init__(self, name, task, _net = None):
+    def __init__(self, name, _net = None):
         """Petri Net Class' constuctor."""
         
         super(BasicPetriNet, self).__init__()
@@ -30,19 +31,12 @@ class BasicPetriNet(object):
             raise Exception("PetriNet 'name' must be a non-empty string.")
         
         self.name = name
-        self._task = task
         self.places = {}
         self.transitions = {}
         self.scale = 1.0
         
         self._place_counter = 0
         self._transition_counter = 0
-        
-        self._initialize()
-        
-        p = NonPrimitiveTaskPlace(self.task, Vec2(150, 300))
-        self.add_place(p)
-        self.add_arc(p, self._main_transition)
         
         root_el = ET.Element('pnml', {'xmlns': 'http://www.pnml.org/version-2009/grammar/pnml'})
         self._tree = ET.ElementTree(root_el)
@@ -64,30 +58,6 @@ class BasicPetriNet(object):
         tmp.text = name
         if page is None:
             ET.SubElement(_net, 'page', {'id': 'PNLab_top_lvl'})
-    
-    @property
-    def task(self):
-        return self._task
-    
-    @task.setter
-    def task(self, val):
-        if not val:
-            raise Exception('Task name cannot be an empty string.')
-        
-        for p in self.places.itervalues():
-            if p.name == self.task:
-                break
-        
-        if not p:
-            raise Exception('Parent Task Place was not found.')
-        
-        p.name = val
-        
-        self._task = val
-    
-    def _initialize(self):
-        self._main_transition = RuleTransition('Rule', Vec2(250, 300))
-        self.add_transition(self._main_transition)
     
     def add_place(self, p):
         """Adds a place from the Petri Net.
@@ -260,7 +230,7 @@ class BasicPetriNet(object):
             if PetriNetClass == None:
                 PetriNetClass = BasicPetriNet
                 
-            pn = PetriNetClass(name, net)
+            pn = PetriNetClass(name, _net = net)
             
             try:
                 scale = float(net.find('toolspecific[@tool="PNLab"]/scale/text').text)
@@ -463,20 +433,51 @@ class BasicPetriNet(object):
         et = self.to_ElementTree()
         et.write(file_name, encoding = 'utf-8', xml_declaration = True, pretty_print = True)
 
-'''
-class PetriNetTypes(object):
-    """'Enum' class for Petri Net types"""
+class RulePN(BasicPetriNet):
     
-    NON_PRIMITIVE_TASK = 'non_primitive_task'
-    PRIMITIVE_TASK = 'primitive_task'
-    FINALIZING = 'finalizing'
-    CANCELING = 'canceling'
-'''
+    def __init__(self, name, task, is_primitive_task, _net = None):
+        
+        super(RulePN, self).__init__(name, _net)
+        
+        self._task = task
+        self._initialize()
+        
+        if is_primitive_task:
+            self._main_place = PrimitiveTaskPlace(self.task, Vec2(150, 300))
+        else:
+            self._main_place = NonPrimitiveTaskPlace(self.task, Vec2(150, 300))
+        self.add_place(self._main_place)
+        self.add_arc(self._main_place, self._main_transition)
+        self.add_arc(self._main_transition, self._main_place)
+    
+    @property
+    def task(self):
+        return self._task
+    
+    @task.setter
+    def task(self, val):
+        if not val:
+            raise Exception('Task name cannot be an empty string.')
+        
+        for p in self.places.itervalues():
+            if p.name == self.task:
+                break
+        
+        if not p:
+            raise Exception('Parent Task Place was not found.')
+        
+        p.name = val
+        
+        self._task = val
+    
+    def _initialize(self):
+        self._main_transition = RuleTransition('Rule', Vec2(350, 300))
+        self.add_transition(self._main_transition)
 
-class NonPrimitiveTaskPN(BasicPetriNet):
+class NonPrimitiveTaskPN(RulePN):
     
-    def __init__(self, name, task, _net = None):
-        super(NonPrimitiveTaskPN, self).__init__(name, task, _net)
+    def __init__(self, name, task, is_primitive_task, _net = None):
+        super(NonPrimitiveTaskPN, self).__init__(name, task, is_primitive_task, _net)
     
     def _initialize(self):
         self._main_transition = PreconditionsTransition('Preconditions', Vec2(350, 300))
@@ -511,40 +512,31 @@ class NonPrimitiveTaskPN(BasicPetriNet):
         
         return super(NonPrimitiveTaskPN, self).add_arc(source, target, weight, _treeElement)
 
-class PrimitiveTaskPN(BasicPetriNet):
+class PrimitiveTaskPN(RulePN):
     
-    def __init__(self, name, task, _net = None):
+    def __init__(self, name, task, is_primitive_task, _net = None):
         
-        super(PrimitiveTaskPN, self).__init__(name, task, _net)
+        super(PrimitiveTaskPN, self).__init__(name, task, is_primitive_task, _net)
     
     @classmethod
     def from_pnml_file(cls, filename):
         BasicPetriNet.from_pnml_file(filename, cls)
 
-class FinalizingPN(BasicPetriNet):
+class FinalizingPN(RulePN):
     
-    def __init__(self, name, task, _net = None):
+    def __init__(self, name, task, is_primitive_task, _net = None):
         
-        super(FinalizingPN, self).__init__(name, task, _net)
+        super(FinalizingPN, self).__init__(name, task, is_primitive_task, _net)
     
     def _initialize(self):
         
         super(FinalizingPN, self)._initialize()
         
-        t = self.transitions[self.name]
-        p = TaskStatusPlace('task_status(?)', t.position + Vec2(-50, 0))
+        t = self._main_transition
+        p = TaskStatusPlace('task_status(?)', t.position + Vec2(-200, -100))
         self.add_place(p)
         self.add_arc(p, t)
-    
-    @classmethod
-    def from_pnml_file(cls, filename):
-        BasicPetriNet.from_pnml_file(filename, cls)
-
-class CancelingPN(BasicPetriNet):
-    
-    def __init__(self, name, task, _net = None):
-        
-        super(CancelingPN, self).__init__(name, task, _net)
+        self.add_arc(t, p)
     
     @classmethod
     def from_pnml_file(cls, filename):

@@ -15,8 +15,8 @@ import zipfile
 import tempfile
 
 from gui.tabmanager import TabManager
-from gui.pneditors import RegularPNEditor, NonPrimitiveTaskPNEditor,\
-    PrimitiveTaskPNEditor, FinalizingPNEditor, CancelingPNEditor
+from gui.pneditors import NonPrimitiveTaskPNEditor,\
+    PrimitiveTaskPNEditor, FinalizingPNEditor, RulePNEditor
 from gui.auxdialogs import InputDialog
 from nodes import FactPlace
 
@@ -77,8 +77,8 @@ class PNPDT(object):
         self.project_tree.tag_configure('petri_net', image = self.petri_net_img)
         
         
-        self.project_tree.insert('', 'end', 'Primitive_Actions/', text = 'Primitive Actions', tags = ['folder', 'primitive_action', 'top_level'], open = True)
-        self.project_tree.insert('', 'end', 'Non_Primitive_Actions/', text = 'Non-Primitive Actions', tags = ['folder', 'non_primitive_action', 'top_level'], open = True)
+        self.project_tree.insert('', 'end', 'Primitive_Actions/', text = 'Primitive Actions', tags = ['folder', 'primitive_folder', 'top_level'], open = True)
+        self.project_tree.insert('', 'end', 'Non_Primitive_Actions/', text = 'Non-Primitive Actions', tags = ['folder', 'non_primitive_folder', 'top_level'], open = True)
         
         self.tab_manager = TabManager(self.workspace_frame,
                                      width = PNPDT.WORKSPACE_WIDTH,
@@ -123,13 +123,21 @@ class PNPDT(object):
         self.primitive_task_menu.add_command(label = 'Add Rule', command = self.create_primitive_task_pn)
         self.primitive_task_menu.add_command(label = 'Import Rule from PNML file', command = self.import_primitive_from_PNML)
         
-        self.finalizing_menu = tk.Menu(self.root, tearoff = 0)
-        self.finalizing_menu.add_command(label = 'Add Rule', command = self.create_finalizing)
-        self.finalizing_menu.add_command(label = 'Import Rule from PNML file', command = self.import_finalizing_from_PNML)
+        self.finalizing_menu_np = tk.Menu(self.root, tearoff = 0)
+        self.finalizing_menu_np.add_command(label = 'Add Rule', command = self.create_finalizing_np)
+        self.finalizing_menu_np.add_command(label = 'Import Rule from PNML file', command = self.import_finalizing_from_PNML)
         
-        self.canceling_menu = tk.Menu(self.root, tearoff = 0)
-        self.canceling_menu.add_command(label = 'Add Rule', command = self.create_canceling)
-        self.canceling_menu.add_command(label = 'Import Rule from PNML file', command = self.import_canceling_from_PNML)
+        self.canceling_menu_np = tk.Menu(self.root, tearoff = 0)
+        self.canceling_menu_np.add_command(label = 'Add Rule', command = self.create_canceling_np)
+        self.canceling_menu_np.add_command(label = 'Import Rule from PNML file', command = self.import_canceling_from_PNML)
+        
+        self.finalizing_menu_p = tk.Menu(self.root, tearoff = 0)
+        self.finalizing_menu_p.add_command(label = 'Add Rule', command = self.create_finalizing_p)
+        self.finalizing_menu_p.add_command(label = 'Import Rule from PNML file', command = self.import_finalizing_from_PNML)
+        
+        self.canceling_menu_p = tk.Menu(self.root, tearoff = 0)
+        self.canceling_menu_p.add_command(label = 'Add Rule', command = self.create_canceling_p)
+        self.canceling_menu_p.add_command(label = 'Import Rule from PNML file', command = self.import_canceling_from_PNML)
         
         self.petri_net_menu = tk.Menu(self.root, tearoff = 0)
         self.petri_net_menu.add_command(label = 'Open', command = self.open_petri_net)
@@ -138,13 +146,15 @@ class PNPDT(object):
         self.petri_net_menu.add_command(label = 'Export Task', command = self.export_to_PNML)
         
         right_click_tag_bindings = {
-                        'non_primitive_action' : self.popup_non_primitive_task_folder_menu,
-                        'primitive_action' : self.popup_primitive_task_folder_menu,
+                        'non_primitive_folder' : self.popup_non_primitive_task_folder_menu,
+                        'primitive_folder' : self.popup_primitive_task_folder_menu,
                         'task' : self.popup_task_folder_menu,
                         'non_primitive_task_pn' : self.popup_non_primitive_task_menu,
                         'primitive_task_pn' : self.popup_primitive_task_menu,
-                        'finalizing' : self.popup_finalizing_menu,
-                        'canceling' : self.popup_canceling_menu,
+                        'finalizing_np' : self.popup_finalizing_menu_np,
+                        'canceling_np' : self.popup_canceling_menu_np,
+                        'finalizing_p' : self.popup_finalizing_menu_p,
+                        'canceling_p' : self.popup_canceling_menu_p,
                         'petri_net' : self.popup_petri_net_menu
                         }
         
@@ -203,14 +213,24 @@ class PNPDT(object):
         self.popped_up_menu = self.primitive_task_menu
         self.popped_up_menu.post(event.x_root, event.y_root)
     
-    def popup_finalizing_menu(self, event):
+    def popup_finalizing_menu_np(self, event):
         self.clicked_element = self.project_tree.identify('item', event.x, event.y)
-        self.popped_up_menu = self.finalizing_menu
+        self.popped_up_menu = self.finalizing_menu_np
         self.popped_up_menu.post(event.x_root, event.y_root)
         
-    def popup_canceling_menu(self, event):
+    def popup_canceling_menu_np(self, event):
         self.clicked_element = self.project_tree.identify('item', event.x, event.y)
-        self.popped_up_menu = self.canceling_menu
+        self.popped_up_menu = self.canceling_menu_np
+        self.popped_up_menu.post(event.x_root, event.y_root)
+    
+    def popup_finalizing_menu_p(self, event):
+        self.clicked_element = self.project_tree.identify('item', event.x, event.y)
+        self.popped_up_menu = self.finalizing_menu_p
+        self.popped_up_menu.post(event.x_root, event.y_root)
+        
+    def popup_canceling_menu_p(self, event):
+        self.clicked_element = self.project_tree.identify('item', event.x, event.y)
+        self.popped_up_menu = self.canceling_menu_p
         self.popped_up_menu.post(event.x_root, event.y_root)
     
     def popup_petri_net_menu(self, event):
@@ -242,18 +262,13 @@ class PNPDT(object):
             count += 1
         return count
     
-    def _add_pne(self, item_id, PNEditorClass = RegularPNEditor, **kwargs):
+    def _add_pne(self, item_id, PNEditorClass = RulePNEditor, **kwargs):
         
         open_tab = kwargs.pop('open_tab', True)
         pne = kwargs.pop('pne_object', None)
-        pn_name = kwargs.pop('pn_name', None)
-        task = kwargs.pop('task', None)
-        
-        if not ((pn_name and task) or pne):
-            raise Exception('Either a PetriNet object or a name and a task name must be passed to the Petri Net Editor.') 
         
         if not pne:
-            pne = PNEditorClass(self.tab_manager, name = pn_name, task = task)
+            pne = PNEditorClass(self.tab_manager, **kwargs)
         self.petri_nets[item_id] = pne
         if open_tab:
             self.tab_manager.add(pne, text = pne.name)
@@ -261,12 +276,12 @@ class PNPDT(object):
         return pne
     
     def create_non_primitive_task(self):
-        self.create_task(is_primitive_action = False)
+        self.create_task(is_primitive_task = False)
     
     def create_primitive_task(self):
-        self.create_task(is_primitive_action = True)
+        self.create_task(is_primitive_task = True)
     
-    def create_task(self, name = None, is_primitive_action = True):
+    def create_task(self, name = None, is_primitive_task = True):
         
         if name is None:
             dialog = InputDialog('Task name',
@@ -284,30 +299,32 @@ class PNPDT(object):
         item_id = self.clicked_element + name + '/'
         
         try:
-            item_tags = ['task', 'folder', 'task_' + name]
+            tags = ['folder', 'task_' + name]
+            item_tags = tags + ['task']
             
-            item_tags.append('primitive_task' if is_primitive_action else 'non_primitive_task')
+            item_tags.append('primitive_task' if is_primitive_task else 'non_primitive_task')
             self.project_tree.insert(self.clicked_element, 'end', item_id, text = name, tags = item_tags, open = True)
             self._adjust_width(name, item_id)
             
             
-            sub_tags = item_tags
-            sub_tags.remove('task')
+            sub_tags = tags
             
-            sub_name = 'Executing rules' if is_primitive_action else 'Decomposing rules'
-            sub_id = item_id + ('Executing_rules/' if is_primitive_action else 'Decomposing_Rules/')
-            sub_tag = 'primitive_task_pn' if is_primitive_action else 'non_primitive_task_pn'
-            self.project_tree.insert(item_id, 'end', sub_id, text = sub_name, tags = sub_tags + [sub_tag], open = True)
+            sub_name = 'Executing rules' if is_primitive_task else 'Decomposing rules'
+            sub_id = item_id + ('Executing_rules/' if is_primitive_task else 'Decomposing_Rules/')
+            sub_tag = 'primitive_task_pn' if is_primitive_task else 'non_primitive_task_pn'
+            self.project_tree.insert(item_id, 'end', sub_id, text = sub_name, tags = sub_tags +  [sub_tag], open = True)
             self._adjust_width(sub_name, sub_id)
             
             sub_name = 'Finalizing rules'
             sub_id = item_id + 'Finalizing_rules/'
-            self.project_tree.insert(item_id, 'end', sub_id, text = sub_name, tags = sub_tags + ['finalizing'], open = True)
+            sub_tag = 'finalizing_p' if is_primitive_task else 'finalizing_np'
+            self.project_tree.insert(item_id, 'end', sub_id, text = sub_name, tags = sub_tags + [sub_tag, 'finalizing'], open = True)
             self._adjust_width(sub_name, sub_id)
             
             sub_name = 'Canceling rules'
             sub_id = item_id + 'Canceling_rules/'
-            self.project_tree.insert(item_id, 'end', sub_id, text = sub_name, tags = sub_tags + ['canceling'], open = True)
+            sub_tag = 'canceling_p' if is_primitive_task else 'canceling_np'
+            self.project_tree.insert(item_id, 'end', sub_id, text = sub_name, tags = sub_tags + [sub_tag, 'canceling'], open = True)
             self._adjust_width(sub_name, sub_id)
             
         except Exception as e:
@@ -317,18 +334,24 @@ class PNPDT(object):
         return item_id
     
     def create_non_primitive_task_pn(self):
-        self.create_petri_net(PNEditorClass = NonPrimitiveTaskPNEditor)
+        self.create_petri_net(PNEditorClass = NonPrimitiveTaskPNEditor, is_primitive_task = False)
     
     def create_primitive_task_pn(self):
-        self.create_petri_net(PNEditorClass = PrimitiveTaskPNEditor)
+        self.create_petri_net(PNEditorClass = PrimitiveTaskPNEditor, is_primitive_task = True)
     
-    def create_finalizing(self):
-        self.create_petri_net(PNEditorClass = FinalizingPNEditor)
+    def create_finalizing_np(self):
+        self.create_petri_net(PNEditorClass = FinalizingPNEditor, is_primitive_task = False)
     
-    def create_canceling(self):
-        self.create_petri_net(PNEditorClass = CancelingPNEditor)
+    def create_canceling_np(self):
+        self.create_petri_net(PNEditorClass = RulePNEditor, is_primitive_task = False)
     
-    def create_petri_net(self, pne_object = None, PNEditorClass = RegularPNEditor):
+    def create_finalizing_p(self):
+        self.create_petri_net(PNEditorClass = FinalizingPNEditor, is_primitive_task = True)
+    
+    def create_canceling_p(self):
+        self.create_petri_net(PNEditorClass = RulePNEditor, is_primitive_task = True)
+    
+    def create_petri_net(self, pne_object = None, PNEditorClass = RulePNEditor, is_primitive_task = False):
         
         if pne_object:
             name = pne_object.name
@@ -362,7 +385,7 @@ class PNPDT(object):
             if pne_object:
                 self._add_pne(item_id, pne_object = pne_object, open_tab = False)
             else:
-                pne_object = self._add_pne(item_id, pn_name = name, task = task, PNEditorClass = PNEditorClass)
+                pne_object = self._add_pne(item_id, PNEditorClass = PNEditorClass, name = name, task = task, is_primitive_task = is_primitive_task)
             pne_object.edited = True
         except Exception as e:
             tkMessageBox.showerror('ERROR', str(e))
@@ -396,8 +419,8 @@ class PNPDT(object):
         
         #Need to set it for the create_task call
         self.clicked_element = self.project_tree.parent(self.clicked_element)
-        is_primitive_action = 'primitive_action' in self.project_tree.item(self.clicked_element, 'tags')
-        item_id = self.create_task(name, is_primitive_action = is_primitive_action)
+        is_primitive_task = 'primitive_task' in self.project_tree.item(self.clicked_element, 'tags')
+        item_id = self.create_task(name, is_primitive_task = is_primitive_task)
         if not item_id:
             return
         
@@ -530,7 +553,7 @@ class PNPDT(object):
         if not filename:
             return
         
-        self._import_from_pnml(filename, CancelingPNEditor)
+        self._import_from_pnml(filename, RulePNEditor)
         
     def _import_from_pnml(self, filename, PNEditorClass):
         
@@ -549,7 +572,7 @@ class PNPDT(object):
             tkMessageBox.showerror('Error loading PetriNet.', 'An error occurred while loading the PetriNet object.\n\n' + str(e))
         
         pne = PNEditorClass(self.tab_manager, PetriNet = pn)
-        self.create_petri_net(pne_object = pne)
+        self.create_petri_net(pne)
         pne.edited = False
         self.tab_manager.add(pne, text = pne.name)
         self.tab_manager.select(pne)
