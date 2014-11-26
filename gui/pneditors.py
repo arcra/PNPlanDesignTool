@@ -37,6 +37,8 @@ class BasicPNEditor(Tkinter.Canvas):
     #_NAME_REGEX = re.compile('^[a-zA-Z][a-zA-Z0-9_ -]*( ?\([a-zA-Z0][a-zA-Z0-9_ -]*(, ?[a-zA-Z0][a-zA-Z0-9_ -]*)*\))?$')
     _TOKEN_RADIUS = 3
     
+    PetriNetClass = BasicPetriNet
+    
     def __init__(self, parent, *args, **kwargs):
         """
         BasePNEditor constructor.
@@ -2376,10 +2378,11 @@ class RegularPNEditor(BasicPNEditor):
     
 class RulePNEditor(RegularPNEditor):
     
+    PetriNetClass = RulePN
+    
     def __init__(self, parent, *args, **kwargs):
         
-        if 'PetriNetClass' not in kwargs:
-            kwargs['PetriNetClass'] = RulePN
+        kwargs['PetriNetClass'] = self.PetriNetClass
         
         RegularPNEditor.__init__(self, parent, *args, **kwargs)
     
@@ -2984,9 +2987,10 @@ class RulePNEditor(RegularPNEditor):
 
 class NonPrimitiveTaskPNEditor(RulePNEditor):
     
+    PetriNetClass = NonPrimitiveTaskPN
+    
     def __init__(self, parent, *args, **kwargs):
         
-        kwargs['PetriNetClass'] = NonPrimitiveTaskPN
         kwargs['is_primitive_task'] = False
         
         RulePNEditor.__init__(self, parent, *args, **kwargs)
@@ -2999,18 +3003,19 @@ class NonPrimitiveTaskPNEditor(RulePNEditor):
     
 class PrimitiveTaskPNEditor(RulePNEditor):
     
+    PetriNetClass = PrimitiveTaskPN
+    
     def __init__(self, parent, *args, **kwargs):
         
-        kwargs['PetriNetClass'] = PrimitiveTaskPN
         kwargs['is_primitive_task'] = True
         
         RulePNEditor.__init__(self, parent, *args, **kwargs)
 
 class FinalizingPNEditor(RulePNEditor):
     
+    PetriNetClass = FinalizingPN
+    
     def __init__(self, parent, *args, **kwargs):
-        
-        kwargs['PetriNetClass'] = FinalizingPN
         
         RulePNEditor.__init__(self, parent, *args, **kwargs)
     
