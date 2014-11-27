@@ -282,26 +282,6 @@ class Place(Node):
                                                          }
                                 )
 
-class NonPrimitiveTaskPlace(Place):
-    
-    FILL_COLOR = '#EEEE00'
-    OUTLINE_COLOR = '#AAAA00'
-    PREFIX = 'npt'
-    
-    def __init__(self, name, position=Vec2(), init_marking=0, capacity=1):
-        super(NonPrimitiveTaskPlace, self).__init__(name, position=position, init_marking=init_marking, capacity=capacity)
-    
-    def can_connect_to(self, target, weight):
-        super(NonPrimitiveTaskPlace, self).can_connect_to(target, weight)
-        if target.__class__ not in [SequenceTransition, PreconditionsTransition, RuleTransition]:
-            raise Exception('TASK places cannot connect to a transition that is not of type SEQUENCE.')
-        
-        if target.__class__ in [PreconditionsTransition, RuleTransition] and self.petri_net.task != self.name:
-            raise Exception('Only the NON-PRIMITIVE TASK Place corresponding to the task this rule belongs to is allowed to connect to a PRECONDITIONS or RULE Transition.')
-        
-        if weight == 0:
-            raise Exception('TASK places cannot connect with an inhibitor arc (weight == 0).')
-
 class PrimitiveTaskPlace(Place):
     
     FILL_COLOR = '#FF6600'
@@ -313,11 +293,20 @@ class PrimitiveTaskPlace(Place):
     
     def can_connect_to(self, target, weight):
         super(PrimitiveTaskPlace, self).can_connect_to(target, weight)
-        if target.__class__ != SequenceTransition:
+        if target.__class__ not in [SequenceTransition, PreconditionsTransition, RuleTransition]:
             raise Exception('TASK places cannot connect to a transition that is not of type SEQUENCE.')
+        
+        if target.__class__ in [PreconditionsTransition, RuleTransition] and self.petri_net.task != self.name:
+            raise Exception('Only the PRIMITIVE TASK Place corresponding to the task this rule belongs to is allowed to connect to a PRECONDITIONS or RULE Transition.')
         
         if weight == 0:
             raise Exception('TASK places cannot connect with an inhibitor arc (weight == 0).')
+
+class NonPrimitiveTaskPlace(PrimitiveTaskPlace):
+    
+    FILL_COLOR = '#EEEE00'
+    OUTLINE_COLOR = '#AAAA00'
+    PREFIX = 'npt'
 
 class CommandPlace(Place):
     
@@ -350,20 +339,11 @@ class FactPlace(Place):
         if target.__class__ == SequenceTransition:
             raise Exception('FACT and STRUCTURED_FACT PLACES cannot be connected to SEQUENCE transitions.')
     
-class StructuredFactPlace(Place):
+class StructuredFactPlace(FactPlace):
     
     FILL_COLOR = '#CC0099'
     OUTLINE_COLOR = '#AA0077'
     PREFIX = 'sfact'
-    
-    def __init__(self, name, position=Vec2(), init_marking=0, capacity=1):
-        super(StructuredFactPlace, self).__init__(name, position=position, init_marking=init_marking, capacity=capacity)
-    
-    def can_connect_to(self, target, weight):
-        super(StructuredFactPlace, self).can_connect_to(target, weight)
-        
-        if target.__class__ == SequenceTransition:
-            raise Exception('FACT and STRUCTURED_FACT PLACES cannot be connected to SEQUENCE transitions.')
     
 class OrPlace(Place):
     

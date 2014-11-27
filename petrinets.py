@@ -506,10 +506,10 @@ class RulePN(BasicPetriNet):
     def from_pnml_file(cls, filename, task):
         BasicPetriNet.from_pnml_file(filename, PetriNetClass = cls, task = task)
 
-class NonPrimitiveTaskPN(RulePN):
+class DecompositionPN(RulePN):
     
     def __init__(self, name, task, is_primitive_task = None, _net = None):
-        super(NonPrimitiveTaskPN, self).__init__(name, task, is_primitive_task, _net)
+        super(DecompositionPN, self).__init__(name, task, is_primitive_task, _net)
     
     def _initialize(self):
         self._main_transition = PreconditionsTransition('Preconditions', Vec2(350, 300))
@@ -543,33 +543,45 @@ class NonPrimitiveTaskPN(RulePN):
             raise Exception('A Sequence Transition cannot have more than one tasks connected to it.\n\
             If synchronization is needed, two hierarchy levels must be created.')
         
-        return super(NonPrimitiveTaskPN, self).add_arc(source, target, weight, _treeElement)
+        return super(DecompositionPN, self).add_arc(source, target, weight, _treeElement)
 
-class PrimitiveTaskPN(RulePN):
+class ExecutionPN(RulePN):
     
     def __init__(self, name, task, is_primitive_task = None, _net = None):
         
-        super(PrimitiveTaskPN, self).__init__(name, task, is_primitive_task, _net)
+        super(ExecutionPN, self).__init__(name, task, is_primitive_task, _net)
     
     @classmethod
     def from_pnml_file(cls, filename, task):
         return BasicPetriNet.from_pnml_file(filename, PetriNetClass = cls, task = task)
 
-class FinalizingPN(RulePN):
+class FinalizationPN(RulePN):
     
     def __init__(self, name, task, is_primitive_task = None, _net = None):
         
-        super(FinalizingPN, self).__init__(name, task, is_primitive_task, _net)
+        super(FinalizationPN, self).__init__(name, task, is_primitive_task, _net)
     
     def _initialize(self):
         
-        super(FinalizingPN, self)._initialize()
+        super(FinalizationPN, self)._initialize()
         
         t = self._main_transition
         p = TaskStatusPlace('task_status(?)', t.position + Vec2(-200, -100))
         self.add_place(p)
         self.add_arc(p, t)
         self.add_arc(t, p)
+    
+    @classmethod
+    def from_pnml_file(cls, filename, task):
+        return BasicPetriNet.from_pnml_file(filename, PetriNetClass = cls, task = task)
+
+class CancelationPN(RulePN):
+    
+    '''
+    def __init__(self, name, task, is_primitive_task = None, _net = None):
+        
+        super(CancelationPN, self).__init__(name, task, is_primitive_task, _net)
+    '''
     
     @classmethod
     def from_pnml_file(cls, filename, task):

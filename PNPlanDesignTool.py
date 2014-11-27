@@ -15,8 +15,8 @@ import zipfile
 import tempfile
 
 from gui.tabmanager import TabManager
-from gui.pneditors import NonPrimitiveTaskPNEditor,\
-    PrimitiveTaskPNEditor, FinalizingPNEditor, RulePNEditor
+from gui.pneditors import DecompositionPNEditor,\
+    ExecutionPNEditor, FinalizationPNEditor, CancelationPNEditor, RulePNEditor
 from gui.auxdialogs import InputDialog
 from nodes import FactPlace
 
@@ -292,7 +292,7 @@ class PNPDT(object):
     def create_primitive_task(self):
         self.create_task(is_primitive_task = True)
     
-    def create_task(self, name = None, is_primitive_task = True, open = True):
+    def create_task(self, name = None, is_primitive_task = True, open_tree = True):
         
         if name is None:
             dialog = InputDialog('Task name',
@@ -313,23 +313,23 @@ class PNPDT(object):
             tags = ['folder', 'task_' + name]
             tags.append('primitive_task' if is_primitive_task else 'non_primitive_task')
             item_tags = tags + ['task']
-            self.project_tree.insert(self.clicked_element, 'end', item_id, text = name, tags = item_tags, open = open)
+            self.project_tree.insert(self.clicked_element, 'end', item_id, text = name, tags = item_tags, open = open_tree)
             self._adjust_width(name, item_id)
             
             sub_name = 'Executing rules' if is_primitive_task else 'Decomposing rules'
             sub_id = item_id + ('Executing_Rules/' if is_primitive_task else 'Decomposing_Rules/')
             sub_tag = 'executing' if is_primitive_task else 'decomposing'
-            self.project_tree.insert(item_id, 'end', sub_id, text = sub_name, tags = tags +  [sub_tag, sub_tag + '_folder'], open = open)
+            self.project_tree.insert(item_id, 'end', sub_id, text = sub_name, tags = tags +  [sub_tag, sub_tag + '_folder'], open = open_tree)
             self._adjust_width(sub_name, sub_id)
             
             sub_name = 'Finalizing rules'
             sub_id = item_id + 'Finalizing_Rules/'
-            self.project_tree.insert(item_id, 'end', sub_id, text = sub_name, tags = tags + ['finalizing', 'finalizing_folder'], open = open)
+            self.project_tree.insert(item_id, 'end', sub_id, text = sub_name, tags = tags + ['finalizing', 'finalizing_folder'], open = open_tree)
             self._adjust_width(sub_name, sub_id)
             
             sub_name = 'Canceling rules'
             sub_id = item_id + 'Canceling_Rules/'
-            self.project_tree.insert(item_id, 'end', sub_id, text = sub_name, tags = tags + ['canceling', 'canceling_folder'], open = open)
+            self.project_tree.insert(item_id, 'end', sub_id, text = sub_name, tags = tags + ['canceling', 'canceling_folder'], open = open_tree)
             self._adjust_width(sub_name, sub_id)
             
         except Exception as e:
@@ -339,24 +339,24 @@ class PNPDT(object):
         return item_id
     
     def create_non_primitive_task_pn(self):
-        self.create_petri_net(PNEditorClass = NonPrimitiveTaskPNEditor, is_primitive_task = False)
+        self.create_petri_net(PNEditorClass = DecompositionPNEditor, is_primitive_task = False)
     
     def create_primitive_task_pn(self):
-        self.create_petri_net(PNEditorClass = PrimitiveTaskPNEditor, is_primitive_task = True)
+        self.create_petri_net(PNEditorClass = ExecutionPNEditor, is_primitive_task = True)
     
     def create_finalizing(self):
         
         item_tags = self.project_tree.item(self.clicked_element, 'tags')
         ipt = 'primitive_task' in item_tags
         
-        self.create_petri_net(PNEditorClass = FinalizingPNEditor, is_primitive_task = ipt)
+        self.create_petri_net(PNEditorClass = FinalizationPNEditor, is_primitive_task = ipt)
     
     def create_canceling(self):
         
         item_tags = self.project_tree.item(self.clicked_element, 'tags')
         ipt = 'primitive_task' in item_tags
         
-        self.create_petri_net(PNEditorClass = RulePNEditor, is_primitive_task = ipt)
+        self.create_petri_net(PNEditorClass = CancelationPNEditor, is_primitive_task = ipt)
     
     def create_petri_net(self, pne_object = None, PNEditorClass = RulePNEditor, is_primitive_task = False):
         
@@ -398,7 +398,6 @@ class PNPDT(object):
                 except:
                     item_tags.remove('canceling_folder')
         
-        
         try:
             if pne_object:
                 self._add_pne(item_id, pne_object = pne_object, open_tab = False)
@@ -408,7 +407,7 @@ class PNPDT(object):
         except Exception as e:
             tkMessageBox.showerror('ERROR', str(e))
             return
-            
+        
         try:
             self.project_tree.insert(self.clicked_element, 'end', item_id, text = name, tags = item_tags)
             self._adjust_width(name, item_id)
@@ -501,7 +500,7 @@ class PNPDT(object):
         tmp_dir = tempfile.mkdtemp()
         
         task_name = zip_file.read('task_name.txt')
-        self.create_task(task_name, is_primitive_task, open = False)
+        self.create_task(task_name, is_primitive_task, open_tree = False)
         task_id = self.clicked_element + task_name + '/'
         
         # Create content from files in each folder
@@ -512,19 +511,19 @@ class PNPDT(object):
             
             if file_name[:18] == 'Decomposing_Rules/':
                 file_name = file_name[18:file_name.find('.')]
-                PNEditorClass = NonPrimitiveTaskPNEditor
+                PNEditorClass = DecompositionPNEditor
                 self.clicked_element = task_id + 'Decomposing_Rules/'
             elif file_name[:16] == 'Executing_Rules/':
-                file_name = file_name[18:file_name.find('.')]
-                PNEditorClass = NonPrimitiveTaskPNEditor
+                file_name = file_name[16:file_name.find('.')]
+                PNEditorClass = ExecutionPNEditor
                 self.clicked_element = task_id + 'Executing_Rules/'
             elif file_name[:17] == 'Finalizing_Rules/':
                 file_name = file_name[17:file_name.find('.')]
-                PNEditorClass = FinalizingPNEditor
+                PNEditorClass = FinalizationPNEditor
                 self.clicked_element = task_id + 'Finalizing_Rules/'
             elif file_name[:16] == 'Canceling_Rules/':
                 file_name = file_name[16:file_name.find('.')]
-                PNEditorClass = RulePNEditor
+                PNEditorClass = CancelationPNEditor
                 self.clicked_element = task_id + 'Canceling_Rules/'
             
             if PNEditorClass is None or not file_name:
@@ -562,13 +561,13 @@ class PNPDT(object):
         if 'executing' in item_tags:
             extension = '.pt'
             filetype = 'Primitive Task '
-            pneditor = PrimitiveTaskPNEditor
+            pneditor = ExecutionPNEditor
         elif 'decomposing' in item_tags:
             extension = '.npt'
             filetype = 'Non-Primitive Task '
-            pneditor = NonPrimitiveTaskPNEditor
+            pneditor = DecompositionPNEditor
         elif 'finalizing' in item_tags:
-            pneditor = FinalizingPNEditor
+            pneditor = FinalizationPNEditor
             if 'primitive_task' in item_tags:
                 extension = '.pt.f'
                 filetype = 'Finalizing Primitive Task '
@@ -576,7 +575,7 @@ class PNPDT(object):
                 extension = '.npt.f'
                 filetype = 'Finalizing Non-Primitive Task '
         elif 'canceling' in item_tags:
-            pneditor = RulePNEditor
+            pneditor = CancelationPNEditor
             if 'primitive_task' in item_tags:
                 extension = '.pt.c'
                 filetype = 'Canceling Primitive Task '
@@ -668,32 +667,33 @@ class PNPDT(object):
         self.project_tree.delete(item)
         return pne, tab_open
     
-    def export_task(self):
+    def export_task(self, zip_filename = None):
         
-        item_tags = self.project_tree.item(self.clicked_element, 'tags')
-        
-        extension = ''
-        filetype = ''
-        
-        if 'primitive_task' in item_tags:
-            extension = '.pt'
-            filetype = 'Primitive '
-        else:
-            extension = '.npt'
-            filetype = 'Non-Primitive '
-        
-        file_name = os.path.basename(self.clicked_element[:-1])
-        pos = file_name.find('(')
-        if pos > -1:
-            file_name = file_name[:pos]
-        
-        zip_filename = tkFileDialog.asksaveasfilename(
-                                                  defaultextension = extension + '.tsk',
-                                                  filetypes=[(filetype + 'Task file', '*' + extension + '.tsk')],
-                                                  title = 'Save as ' + filetype + 'Task file...',
-                                                  initialdir = os.path.dirname(self.file_path) if self.file_path is not None else os.path.expanduser('~/Desktop'),
-                                                  initialfile = file_name
-                                              )
+        if not zip_filename:
+            item_tags = self.project_tree.item(self.clicked_element, 'tags')
+            
+            extension = ''
+            filetype = ''
+            
+            if 'primitive_task' in item_tags:
+                extension = '.pt'
+                filetype = 'Primitive '
+            else:
+                extension = '.npt'
+                filetype = 'Non-Primitive '
+            
+            file_name = os.path.basename(self.clicked_element[:-1])
+            pos = file_name.find('(')
+            if pos > -1:
+                file_name = file_name[:pos]
+            
+            zip_filename = tkFileDialog.asksaveasfilename(
+                                                      defaultextension = extension + '.tsk',
+                                                      filetypes=[(filetype + 'Task file', '*' + extension + '.tsk')],
+                                                      title = 'Save as ' + filetype + 'Task file...',
+                                                      initialdir = os.path.dirname(self.file_path) if self.file_path is not None else os.path.expanduser('~/Desktop'),
+                                                      initialfile = file_name
+                                                  )
         if not zip_filename:
             return
         
@@ -717,12 +717,6 @@ class PNPDT(object):
         for f in folders:
             children = self.project_tree.get_children(f)
             folder_name = os.path.basename(f[:-1])
-            if not children:
-                file_path = os.path.join(tmp_dir, folder_name)
-                os.mkdir(file_path)
-                zip_file.write(file_path, folder_name)
-                os.rmdir(file_path)
-                continue
             for current in children:
                 
                 file_name = os.path.basename(current)
@@ -775,52 +769,63 @@ class PNPDT(object):
     #######################################################
     #                FILE MENU ACTIONS
     #######################################################
+    
+    def _check_edited(self):
+        edited = False
+        for pne in self.petri_nets.itervalues():
+            if pne.edited:
+                edited = True
+                break
+        return edited
+    
     def open(self):
+        
+        if self._check_edited():
+            if not tkMessageBox.askokcancel('Close without saving?', 'Are you sure you want to discard any unsaved changes?', default = tkMessageBox.CANCEL):
+                return
+        
         zip_filename = tkFileDialog.askopenfilename(
-                                                  defaultextension = '.rpnp',
-                                                  filetypes=[('Robotic Petri Net Plan file', '*.rpnp')],
-                                                  title = 'Open RPNP file...',
+                                                  defaultextension = '.pnpdt',
+                                                  filetypes=[('Petri Net Plan Design Tool file', '*.pnpdt')],
+                                                  title = 'Open PNPDT file...',
                                                   initialdir = os.path.dirname(self.file_path) if self.file_path is not None else os.path.expanduser('~/Desktop'),
                                                   )
         if not zip_filename:
             return
         
-        items = self.project_tree.get_children('Actions/') \
-        + self.project_tree.get_children('CommActions/') \
-        + self.project_tree.get_children('Tasks/') \
-        + self.project_tree.get_children('Environment/')
+        items = self.project_tree.get_children('Primitive_Tasks/') \
+            + self.project_tree.get_children('Non_Primitive_Tasks/')
         
         for i in items:
-            self.delete_petri_net(i)
+            for folder in self.project_tree.get_children(i):
+                for pn in self.project_tree.get_children(folder):
+                    self.delete_petri_net(pn)
+            self.project_tree.delete(i)
         
         self.file_path = zip_filename
         
         zip_file = zipfile.ZipFile(self.file_path, 'r')
         tmp_dir = tempfile.mkdtemp()
         
+        is_primitive_task = True
+        
         for x in zip_file.infolist():
-            prev_sep = -1
-            sep_index = x.filename.find('/', 0)
-            while sep_index > -1:
-                current_dir = x.filename[:sep_index + 1]
-                parent = x.filename[:prev_sep + 1]
-                if not self.project_tree.exists(current_dir):
-                    name = current_dir[current_dir[:-1].rfind('/') + 1:]
-                    self.project_tree.insert(parent, 'end', current_dir, text = name, tags = ['folder'], open = True)
-                    self._adjust_width(name, current_dir)
-                prev_sep = sep_index
-                sep_index = x.filename.find('/', sep_index + 1)
-            if x.filename[-5:] == '.pnml':
-                last_sep = x.filename.rfind('/') + 1
-                filename = x.filename[last_sep:]
-                parent = x.filename[:last_sep]
-                file_path = os.path.join(tmp_dir, filename)
-                f = open(file_path, 'w')
-                data = zip_file.read(x)
-                f.write(data)
-                f.close()
-                self._import_from_pnml(file_path, parent)
-                os.remove(file_path)
+            if x.filename[-7:] == '.pt.tsk':
+                self.clicked_element = 'Primitive_Tasks/'
+                is_primitive_task = True
+            elif x.filename[-8:] == '.npt.tsk':
+                self.clicked_element = 'Non_Primitive_Tasks/'
+                is_primitive_task = False
+            else:
+                print 'WARNING: Unknown file was not loaded - ' + x.filename
+                continue
+            
+            file_name = os.path.join(tmp_dir, x.filename)
+            f = open(file_name, 'w')
+            f.write(zip_file.read(x))
+            f.close()
+            self._import_task(file_name, is_primitive_task)
+            os.remove(file_name)
             
         os.rmdir(tmp_dir)
         zip_file.close()
@@ -839,25 +844,32 @@ class PNPDT(object):
             return
         tmp_dir = tempfile.mkdtemp()
         
-        folders = ('Actions/', 'CommActions/', 'Tasks/', 'Environment/')
         
-        for f in folders:
-            children = self.project_tree.get_children(f)
-            if not children:
-                file_path = os.path.join(tmp_dir, f)
-                os.mkdir(file_path)
-                zip_file.write(file_path, f)
-                os.rmdir(file_path)
-                continue
-            for current in children:
-                path = current + '.pnml'
-                pne = self.petri_nets[current]
-                file_name = os.path.basename(path)
-                file_path = os.path.join(tmp_dir, file_name)
-                pne._petri_net.to_pnml_file(file_path)
-                zip_file.write(file_path, path)
-                pne.edited = False
-                os.remove(file_path)
+        for c in self.project_tree.get_children('Primitive_Tasks/'):
+            self.clicked_element = c
+            task_name = os.path.basename(self.clicked_element[:-1])
+            pos = task_name.find('(')
+            if pos > -1:
+                task_name = task_name[:pos]
+            task_name = task_name + '.pt.tsk'
+            file_path = os.path.join(tmp_dir, task_name)
+            self.export_task(file_path)
+            zip_file.write(file_path, task_name)
+            os.remove(file_path)
+        
+        for c in self.project_tree.get_children('Non_Primitive_Tasks/'):
+            self.clicked_element = c
+            
+            task_name = os.path.basename(self.clicked_element[:-1])
+            pos = task_name.find('(')
+            if pos > -1:
+                task_name = task_name[:pos]
+            task_name = task_name + '.npt.tsk'
+            
+            file_path = os.path.join(tmp_dir, task_name)
+            self.export_task(file_path)
+            zip_file.write(file_path, task_name)
+            os.remove(file_path)
         
         os.rmdir(tmp_dir)
         zip_file.close()
@@ -876,9 +888,9 @@ class PNPDT(object):
     
     def save_as(self):
         zip_filename = tkFileDialog.asksaveasfilename(
-                                                  defaultextension = '.rpnp',
-                                                  filetypes=[('Robotic Petri Net Plan file', '*.rpnp')],
-                                                  title = 'Save as RPNP file...',
+                                                  defaultextension = '.pnpdt',
+                                                  filetypes=[('Petri Net Plan Design Tool file', '*.pnpdt')],
+                                                  title = 'Save as PNPDT file...',
                                                   initialdir = os.path.dirname(self.file_path) if self.file_path is not None else os.path.expanduser('~/Desktop'),
                                                   initialfile = os.path.basename(self.file_path) if self.file_path is not None else ''
                                                   )
@@ -888,17 +900,9 @@ class PNPDT(object):
         self.file_path = zip_filename
         
         self.save()
-        
     
     def exit(self, event = None):
-        
-        edited = False
-        for pne in self.petri_nets.itervalues():
-            if pne.edited:
-                edited = True
-                break
-        
-        if edited:
+        if self._check_edited():
             if not tkMessageBox.askokcancel('Exit without saving?', 'Are you sure you want to quit without saving any changes?', default = tkMessageBox.CANCEL):
                 return
         
