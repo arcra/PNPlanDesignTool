@@ -279,7 +279,7 @@ class BasicPNEditor(Tkinter.Canvas):
         self.itemconfig('transition&&!label', outline = '#FFFF00', width = 5)
         place_id = self._get_place_id()
         self._source = self._petri_net.places[place_id]
-        self._connecting_place_fn_id = self.bind('<Motion>', self._connecting_place, '+')
+        self._connecting_node_fn_id = self.bind('<Motion>', self._connecting_place, '+')
     
     def _connect_place_to_bidirectional(self):
         self._connecting_double = True
@@ -363,7 +363,7 @@ class BasicPNEditor(Tkinter.Canvas):
         self.itemconfig('place&&!label&&!token', outline = '#FFFF00', width = 5)
         transition_id = self._get_transition_id()
         self._source = self._petri_net.transitions[transition_id]
-        self._connecting_transition_fn_id = self.bind('<Motion>', self._connecting_transition, '+')
+        self._connecting_node_fn_id = self.bind('<Motion>', self._connecting_transition, '+')
     
     def _connect_transition_to_bidirectional(self):
         self._connecting_double = True
@@ -2198,7 +2198,7 @@ class BasicPNEditor(Tkinter.Canvas):
         for tc in TRANSITION_CLASSES:
             self.itemconfig('transition&&' + tc.__name__ + '&&!label', outline = tc.OUTLINE_COLOR, width = LINE_WIDTH)
         
-        self.unbind('<Motion>', self._connecting_place_fn_id)
+        self.unbind('<Motion>', self._connecting_node_fn_id)
         self.delete('connecting')
         
         if canceled:
@@ -2239,7 +2239,7 @@ class BasicPNEditor(Tkinter.Canvas):
         for pc in PLACE_CLASSES:
             self.itemconfig('place&&' + pc.__name__ + '&&!label&&!token', outline = pc.OUTLINE_COLOR, width = LINE_WIDTH)
         
-        self.unbind('<Motion>', self._connecting_transition_fn_id)
+        self.unbind('<Motion>', self._connecting_node_fn_id)
         self.delete('connecting')
         
         if canceled:
@@ -2509,8 +2509,8 @@ class RulePNEditor(RegularPNEditor):
     def _cancel_creation(self):
         self.delete('selection')
         self.delete('connecting_arc')
-        self.unbind('<Motion>', self._connecting_place_fn_id)
-        self.unbind('<Motion>', self._adding_place_fn_id)
+        self.unbind('<Motion>', self._connecting_node_fn_id)
+        self.unbind('<Motion>', self._adding_node_fn_id)
     
     def _add_non_primitive_task(self):
         self._add_task(NonPrimitiveTaskPlace)
@@ -2554,8 +2554,8 @@ class RulePNEditor(RegularPNEditor):
         self._connecting_t = self._petri_net.transitions[transition_id]
         self._place_class = PlaceClass
         
-        self._adding_place_fn_id = self.bind('<Motion>', self._dragCallback, '+')
-        self._connecting_place_fn_id = self.bind('<Motion>', self._connecting_transition_to_place, '+')
+        self._adding_node_fn_id = self.bind('<Motion>', self._dragCallback, '+')
+        self._connecting_node_fn_id = self.bind('<Motion>', self._connecting_transition_to_place, '+')
     
     def _add_fact_precondition(self):
         self._add_fact_place_precondition(FactPlace)
@@ -2579,8 +2579,8 @@ class RulePNEditor(RegularPNEditor):
         self._connecting_t = self._petri_net.transitions[transition_id]
         self._place_class = PlaceClass
         
-        self._adding_place_fn_id = self.bind('<Motion>', self._dragCallback, '+')
-        self._connecting_place_fn_id = self.bind('<Motion>', self._connecting_place_to_transition, '+')
+        self._adding_node_fn_id = self.bind('<Motion>', self._dragCallback, '+')
+        self._connecting_node_fn_id = self.bind('<Motion>', self._connecting_place_to_transition, '+')
     
     def _add_fact(self):
         self._add_fact_place(FactPlace)
@@ -2604,8 +2604,8 @@ class RulePNEditor(RegularPNEditor):
         self._connecting_t = self._petri_net.transitions[transition_id]
         self._place_class = PlaceClass
         
-        self._adding_place_fn_id = self.bind('<Motion>', self._dragCallback, '+')
-        self._connecting_place_fn_id = self.bind('<Motion>', self._connecting_transition_to_place, '+')
+        self._adding_node_fn_id = self.bind('<Motion>', self._dragCallback, '+')
+        self._connecting_node_fn_id = self.bind('<Motion>', self._connecting_transition_to_place, '+')
     
     def _add_negated_fact(self):
         self._add_negated_fact_place(FactPlace)
@@ -2629,8 +2629,8 @@ class RulePNEditor(RegularPNEditor):
         self._connecting_t = self._petri_net.transitions[transition_id]
         self._place_class = PlaceClass
         
-        self._adding_place_fn_id = self.bind('<Motion>', self._dragCallback, '+')
-        self._connecting_place_fn_id = self.bind('<Motion>', self._connecting_negated_place_to_transition, '+')
+        self._adding_node_fn_id = self.bind('<Motion>', self._dragCallback, '+')
+        self._connecting_node_fn_id = self.bind('<Motion>', self._connecting_negated_place_to_transition, '+')
     
     def _add_or(self):
         self._state = 'adding_or'
@@ -2691,8 +2691,8 @@ class RulePNEditor(RegularPNEditor):
         transition_id = self._get_transition_id(self._last_clicked_id)
         self._connecting_t = self._petri_net.transitions[transition_id]
         
-        self._adding_place_fn_id = self.bind('<Motion>', self._dragCallback, '+')
-        self._connecting_place_fn_id = self.bind('<Motion>', self._connecting_place_to_transition, '+')
+        self._adding_node_fn_id = self.bind('<Motion>', self._dragCallback, '+')
+        self._connecting_node_fn_id = self.bind('<Motion>', self._connecting_place_to_transition, '+')
         
     def _add_nor(self):
         self._state = 'adding_nor'
@@ -2753,8 +2753,8 @@ class RulePNEditor(RegularPNEditor):
         transition_id = self._get_transition_id(self._last_clicked_id)
         self._connecting_t = self._petri_net.transitions[transition_id]
         
-        self._adding_place_fn_id = self.bind('<Motion>', self._dragCallback, '+')
-        self._connecting_place_fn_id = self.bind('<Motion>', self._connecting_negated_place_to_transition, '+')
+        self._adding_node_fn_id = self.bind('<Motion>', self._dragCallback, '+')
+        self._connecting_node_fn_id = self.bind('<Motion>', self._connecting_negated_place_to_transition, '+')
     
     def _add_transition(self):
         self._state = 'adding_transition'
@@ -2769,8 +2769,8 @@ class RulePNEditor(RegularPNEditor):
         place_id = self._get_place_id(self._last_clicked_id)
         self._connecting_p = self._petri_net.places[place_id]
         
-        self._adding_transition_fn_id = self.bind('<Motion>', self._dragCallback, '+')
-        self._connecting_transition_fn_id = self.bind('<Motion>', self._connecting_transition_to_or_place, '+')
+        self._adding_node_fn_id = self.bind('<Motion>', self._dragCallback, '+')
+        self._connecting_node_fn_id = self.bind('<Motion>', self._connecting_transition_to_or_place, '+')
     
     def _add_command(self):
         self._state = 'adding_command'
@@ -2788,8 +2788,8 @@ class RulePNEditor(RegularPNEditor):
         
         self._connecting_t = self._petri_net.transitions[transition_id]
         
-        self._adding_place_fn_id = self.bind('<Motion>', self._dragCallback, '+')
-        self._connecting_place_fn_id = self.bind('<Motion>', self._connecting_transition_to_place, '+')
+        self._adding_node_fn_id = self.bind('<Motion>', self._dragCallback, '+')
+        self._connecting_node_fn_id = self.bind('<Motion>', self._connecting_transition_to_place, '+')
     
     def _connecting_transition_to_place(self, event):
         
@@ -2897,8 +2897,8 @@ class RulePNEditor(RegularPNEditor):
         except Exception as e:
             tkMessageBox.showerror('Creation Error', str(e))
         finally:
-            self.unbind('<Motion>', self._connecting_place_fn_id)
-            self.unbind('<Motion>', self._adding_place_fn_id)
+            self.unbind('<Motion>', self._connecting_node_fn_id)
+            self.unbind('<Motion>', self._adding_node_fn_id)
     
     def _finish_adding_fact_precondition(self, event):
         try:
@@ -2906,8 +2906,8 @@ class RulePNEditor(RegularPNEditor):
         except Exception as e:
             tkMessageBox.showerror('Creation Error', str(e))
         finally:
-            self.unbind('<Motion>', self._connecting_place_fn_id)
-            self.unbind('<Motion>', self._adding_place_fn_id)
+            self.unbind('<Motion>', self._connecting_node_fn_id)
+            self.unbind('<Motion>', self._adding_node_fn_id)
     
     def _finish_adding_negated_fact(self, event):
         try:
@@ -2915,8 +2915,8 @@ class RulePNEditor(RegularPNEditor):
         except Exception as e:
             tkMessageBox.showerror('Creation Error', str(e))
         finally:
-            self.unbind('<Motion>', self._connecting_place_fn_id)
-            self.unbind('<Motion>', self._adding_place_fn_id)
+            self.unbind('<Motion>', self._connecting_node_fn_id)
+            self.unbind('<Motion>', self._adding_node_fn_id)
     
     def _finish_adding_fact(self, event):
         try:
@@ -2924,8 +2924,8 @@ class RulePNEditor(RegularPNEditor):
         except Exception as e:
             tkMessageBox.showerror('Creation Error', str(e))
         finally:
-            self.unbind('<Motion>', self._connecting_place_fn_id)
-            self.unbind('<Motion>', self._adding_place_fn_id)
+            self.unbind('<Motion>', self._connecting_node_fn_id)
+            self.unbind('<Motion>', self._adding_node_fn_id)
     
     def _finish_adding_or(self, event):
         try:
@@ -2945,8 +2945,8 @@ class RulePNEditor(RegularPNEditor):
         except Exception as e:
             tkMessageBox.showerror('Creation Error', str(e))
         finally:
-            self.unbind('<Motion>', self._connecting_place_fn_id)
-            self.unbind('<Motion>', self._adding_place_fn_id)
+            self.unbind('<Motion>', self._connecting_node_fn_id)
+            self.unbind('<Motion>', self._adding_node_fn_id)
     
     def _finish_adding_nor(self, event):
         try:
@@ -2966,8 +2966,8 @@ class RulePNEditor(RegularPNEditor):
         except Exception as e:
             tkMessageBox.showerror('Creation Error', str(e))
         finally:
-            self.unbind('<Motion>', self._connecting_place_fn_id)
-            self.unbind('<Motion>', self._adding_place_fn_id)
+            self.unbind('<Motion>', self._connecting_node_fn_id)
+            self.unbind('<Motion>', self._adding_node_fn_id)
     
     def _finish_adding_transition(self, event):
         try:
@@ -2984,8 +2984,8 @@ class RulePNEditor(RegularPNEditor):
         except Exception as e:
             tkMessageBox.showerror('Creation Error', str(e))
         finally:
-            self.unbind('<Motion>', self._connecting_place_fn_id)
-            self.unbind('<Motion>', self._adding_place_fn_id)
+            self.unbind('<Motion>', self._connecting_node_fn_id)
+            self.unbind('<Motion>', self._adding_node_fn_id)
     
     def _finish_adding_command(self, event):
         try:
@@ -2993,8 +2993,8 @@ class RulePNEditor(RegularPNEditor):
         except Exception as e:
             tkMessageBox.showerror('Creation Error', str(e))
         finally:
-            self.unbind('<Motion>', self._connecting_place_fn_id)
-            self.unbind('<Motion>', self._adding_place_fn_id)
+            self.unbind('<Motion>', self._connecting_node_fn_id)
+            self.unbind('<Motion>', self._adding_node_fn_id)
     
     def _add_task_arc(self, p):
         self.delete('selection')
@@ -3091,8 +3091,8 @@ class CancelationPNEditor(RulePNEditor):
         self._connecting_t = self._petri_net.transitions[transition_id]
         self._is_successful = is_successful
         
-        self._adding_place_fn_id = self.bind('<Motion>', self._dragCallback, '+')
-        self._connecting_place_fn_id = self.bind('<Motion>', self._connecting_transition_to_place, '+')
+        self._adding_node_fn_id = self.bind('<Motion>', self._dragCallback, '+')
+        self._connecting_node_fn_id = self.bind('<Motion>', self._connecting_transition_to_place, '+')
     
     def _finish_adding_task_status(self, event):
         try:
@@ -3110,8 +3110,8 @@ class CancelationPNEditor(RulePNEditor):
         except Exception as e:
             tkMessageBox.showerror('Creation Error', str(e))
         finally:
-            self.unbind('<Motion>', self._connecting_place_fn_id)
-            self.unbind('<Motion>', self._adding_place_fn_id)
+            self.unbind('<Motion>', self._connecting_node_fn_id)
+            self.unbind('<Motion>', self._adding_node_fn_id)
     
     def _make_successful(self):
         self._change_task_status('successful')

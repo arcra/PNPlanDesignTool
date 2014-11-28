@@ -43,7 +43,7 @@ class Node(object):
         if not name:
             raise Exception('A Node name must be a non-empty string.')
         
-        self._name = name
+        self.name = name
         self.petri_net = None
         self.position = Vec2(position)
         self._incoming_arcs = {}
@@ -313,7 +313,7 @@ class CommandPlace(Place):
     FILL_COLOR = '#99FF66'
     OUTLINE_COLOR = '#77DD44'
     PREFIX = 'cmd'
-    REGEX = re.compile(r'[a-zA-Z][a-zA-Z0-9_-]*\s*\(\s*((\?[a-zA-Z][a-zA-Z0-9_-]*)|("[^"]*"))\s*,\s*((\?[a-zA-Z][a-zA-Z0-9_-]*)|("[^"]*"))(\s*,\s*((\?[a-zA-Z][a-zA-Z0-9_-]*)|([0-9]+))){,2}\s*\)')
+    REGEX = re.compile(r'[a-zA-Z][a-zA-Z0-9_]*(\s*\(\s*((\?[a-zA-Z][a-zA-Z0-9_]*)|("[^"]*"))(\s*,\s*((\?[a-zA-Z][a-zA-Z0-9_]*)|("[^"]*"))){1,3}\s*\))?')
     
     def __init__(self, name, position=Vec2(), init_marking=0, capacity=1):
         super(CommandPlace, self).__init__(name, position=position, init_marking=init_marking, capacity=capacity)
@@ -322,13 +322,21 @@ class CommandPlace(Place):
         super(CommandPlace, self).can_connect_to(target, weight)
         raise Exception('COMMAND places cannot connect to any transition.')
     
+    def _validate_name(self, val):
+        
+        super(CommandPlace, self)._validate_name(val)
+        
+        #Assert
+        if not self.REGEX.match(val):
+            raise Exception("A CommandPlace name should be a command name, followed by parameters that can either be a constant value or a bound variable.")
+    
 class FactPlace(Place):
     
     FILL_COLOR = '#4444FF'
     OUTLINE_COLOR = '#0000BB'
     PREFIX = 'fact'
     
-    REGEX = re.compile(r'[a-zA-Z][a-zA-Z0-9_-]*\s*(\(\s*((\??([a-zA-Z][a-zA-Z0-9_-]*)?)|("[^"]*"))(\s*,\s*((\??([a-zA-Z][a-zA-Z0-9_-]*)?)|("[^"]*")))*\s*\))?')
+    REGEX = re.compile(r'[a-zA-Z][a-zA-Z0-9_]*(\s*\(\s*((\$?\?)|((\$?\?)?[a-zA-Z][a-zA-Z0-9_]*)|("[^"]*"))(\s*,\s*((\$?\?)|((\$?\?)?[a-zA-Z][a-zA-Z0-9_]*)|("[^"]*")))*\s*\))?')
     
     def __init__(self, name, position=Vec2(), init_marking=0, capacity=1):
         super(FactPlace, self).__init__(name, position=position, init_marking=init_marking, capacity=capacity)
@@ -339,11 +347,21 @@ class FactPlace(Place):
         if target.__class__ == SequenceTransition:
             raise Exception('FACT and STRUCTURED_FACT PLACES cannot be connected to SEQUENCE transitions.')
     
+    def _validate_name(self, val):
+        
+        super(FactPlace, self)._validate_name(val)
+        
+        #Assert
+        if not self.REGEX.match(val):
+            raise Exception("A FactPlace should be a command name, followed by parameters that can either be a constant value or a bound variable.")
+    
 class StructuredFactPlace(FactPlace):
     
     FILL_COLOR = '#CC0099'
     OUTLINE_COLOR = '#AA0077'
     PREFIX = 'sfact'
+    
+    REGEX = re.compile(r'[a-zA-Z][a-zA-Z0-9_]*(\s*\(\s*[a-zA-Z][a-zA-Z0-9_]*\s*:\s*(((\$?\?)?[a-zA-Z][a-zA-Z0-9_]*)|("[^"]*"))(\s*,\s*[a-zA-Z][a-zA-Z0-9_]*\s*:\s*(((\$?\?)?[a-zA-Z][a-zA-Z0-9_]*)|("[^"]*")))*\s*\))?')
     
 class OrPlace(Place):
     
