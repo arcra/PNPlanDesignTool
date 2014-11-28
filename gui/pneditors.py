@@ -2427,7 +2427,7 @@ class RulePNEditor(RegularPNEditor):
                                                              ('Add Primitive Task', self._add_primitive_task)
                                                             ]
         self._menus_options_sets_dict['or_operations'] = [
-                                                             ('Add Transition', self._add_transition)
+                                                             ('Add AND Transition', self._add_transition)
                                                             ]
         self._menus_options_sets_dict['command_operations'] = [
                                                              ('Add Command', self._add_command)

@@ -465,6 +465,9 @@ class RulePN(BasicPetriNet):
     
     def __init__(self, name, task, is_primitive_task = None, _net = None):
         
+        self._main_transition_ = None
+        self._main_place_ = None
+        
         super(RulePN, self).__init__(name, _net)
         
         self._task = task
@@ -498,6 +501,48 @@ class RulePN(BasicPetriNet):
         
         self._task = val
     
+    @property
+    def _main_transition(self):
+        
+        if self._main_transition_:
+            return self._main_transition_
+        
+        for t in self.transitions.itervalues():
+            if t.__class__ is PreconditionsTransition or t.__class__ is RuleTransition:
+                self._main_transition_ = t
+                return self._main_transition_
+        
+        raise Exception('Main Transition was not found!')
+    
+    @_main_transition.setter
+    def _main_transition(self, val):
+        
+        if not isinstance(val, Transition):
+            raise Exception("Main Transition must be an object from Transition Class or derived.")
+        
+        self._main_transition_ = val
+    
+    @property
+    def _main_place(self):
+        
+        if self._main_place_:
+            return self._main_place_
+        
+        for p in self.places.itervalues():
+            if p.name == self.task:
+                self._main_place_ = p
+                return self._main_place_
+        
+        raise Exception('Main Place was not found!')
+    
+    @_main_place.setter
+    def _main_place(self, val):
+        
+        if not isinstance(val, Place):
+            raise Exception("Main Place must be an object from Place Class or derived.")
+        
+        self._main_place_ = val
+    
     def _initialize(self):
         self._main_transition = RuleTransition('Rule', Vec2(350, 300))
         self.add_transition(self._main_transition)
@@ -505,6 +550,9 @@ class RulePN(BasicPetriNet):
     @classmethod
     def from_pnml_file(cls, filename, task):
         BasicPetriNet.from_pnml_file(filename, PetriNetClass = cls, task = task)
+    
+    def get_CLIPS_code(self):
+        
 
 class DecompositionPN(RulePN):
     
@@ -576,12 +624,6 @@ class FinalizationPN(RulePN):
         return BasicPetriNet.from_pnml_file(filename, PetriNetClass = cls, task = task)
 
 class CancelationPN(RulePN):
-    
-    '''
-    def __init__(self, name, task, is_primitive_task = None, _net = None):
-        
-        super(CancelationPN, self).__init__(name, task, is_primitive_task, _net)
-    '''
     
     @classmethod
     def from_pnml_file(cls, filename, task):

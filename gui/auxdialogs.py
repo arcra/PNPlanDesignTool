@@ -83,6 +83,28 @@ def FloatDialog(title, text, label, init_value = 0.0):
 def NonNegativeFloatDialog(title, text, label, init_value = 0.0):
     return InputDialog(title, text, label, _POSITIVE_FLOAT_REGEX, str(init_value), 'Please enter a valid positive decimal number.')
 
+class InfoDialog(object):
+    
+    def __init__(self, title, text):
+        super(InputDialog, self).__init__()
+        
+        self.window = tk.Toplevel()#takefocus = True)
+        self.window.title(title)
+        
+        self.window.bind('<KeyPress-Return>', self.ok_callback)
+        
+        self.text = tk.Label(self.window, text = text)
+        self.text.grid(row = 0, column = 0, sticky = tk.NW)
+        
+        self.ok_button = tk.Button(self.window, text = 'Ok', command = self.ok_callback)
+        self.ok_button.grid(row = 1, column = 2)
+        
+        self.window.grab_set()
+        self.window.focus_set()
+    
+    def ok_callback(self, event = None):
+        self.window.destroy()
+
 class _SelectTreeElementDialog(object):
     
     def __init__(self, src_tree, item, root, title, widget_text, select_folder):
