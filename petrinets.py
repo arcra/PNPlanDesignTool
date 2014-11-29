@@ -481,6 +481,10 @@ class RulePN(BasicPetriNet):
             self.add_arc(self._main_place, self._main_transition)
             self.add_arc(self._main_transition, self._main_place)
     
+    def _initialize(self):
+        self._main_transition = RuleTransition('Rule', Vec2(350, 300))
+        self.add_transition(self._main_transition)
+    
     @property
     def task(self):
         return self._task
@@ -543,16 +547,26 @@ class RulePN(BasicPetriNet):
         
         self._main_place_ = val
     
-    def _initialize(self):
-        self._main_transition = RuleTransition('Rule', Vec2(350, 300))
-        self.add_transition(self._main_transition)
-    
     @classmethod
     def from_pnml_file(cls, filename, task):
         BasicPetriNet.from_pnml_file(filename, PetriNetClass = cls, task = task)
     
     def get_CLIPS_code(self):
         
+        preconditions = self._get_precondtions()
+        
+        
+        
+        
+    def _get_preconditions(self):
+        
+        incoming_arcs = self._main_transition._incoming_arcs.values()
+        task_arc = incoming_arcs.pop(repr(self._main_place))
+        
+        return [
+                task_arc.source._get_preconditions(),
+                ['active_task']
+            ]
 
 class DecompositionPN(RulePN):
     

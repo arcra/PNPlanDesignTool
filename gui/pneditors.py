@@ -2414,6 +2414,7 @@ class RulePNEditor(RegularPNEditor):
                                                              ('Add NEGATAED Fact Precondition', self._add_negated_fact),
                                                              ('Add Structured Fact Precondition', self._add_structured_fact),
                                                              ('Add NEGATED Structured Fact Precondition', self._add_negated_structured_fact),
+                                                             ('Add NAND Precondition', self._add_nand),
                                                              ('Add OR Precondition', self._add_or),
                                                              ('Add NOR Precondition', self._add_nor)
                                                             ]
@@ -2466,6 +2467,10 @@ class RulePNEditor(RegularPNEditor):
         
         if self._state == 'adding_fact':
             self._finish_adding_fact(event)
+            return True
+        
+        if self._state == 'adding_nand':
+            self._finish_adding_nand(event)
             return True
         
         if self._state == 'adding_or':
@@ -2756,6 +2761,50 @@ class RulePNEditor(RegularPNEditor):
         self._adding_node_fn_id = self.bind('<Motion>', self._dragCallback, '+')
         self._connecting_node_fn_id = self.bind('<Motion>', self._connecting_negated_place_to_transition, '+')
     
+    def _add_nand(self):
+        self._state = 'adding_nand'
+        self.grab_set()
+        self._anchor_set = True
+        self._anchor_tag = 'selection'
+        
+        #Create drawings (selection)
+        p_position = self._last_point
+        t_position = p_position + Vec2(-80, 0)
+        dummy_transition = AndTransition('dummy1', t_position)
+        
+        place_vec = dummy_transition.position - p_position
+        place_point = p_position + place_vec.unit*PLACE_RADIUS*self._current_scale
+        transition_point = self._find_intersection(dummy_transition, p_position)
+        
+        arc_id = self.create_line(transition_point.x,
+                     transition_point.y,
+                     place_point.x,
+                     place_point.y,
+                     tags = ['selection'],
+                     width = LINE_WIDTH,
+                     arrow= Tkinter.LAST,
+                     arrowshape = (10,12,5) )
+        
+        t_id = self._draw_transition_item(transition = dummy_transition)
+        place_id = self._draw_place_item(p_position, OrPlace)
+        
+        label_id = self.create_text(p_position.x,
+                         p_position.y + PLACE_LABEL_PADDING*self._current_scale,
+                         text = 'NAND',
+                         tags=['selection'],
+                         font = self.text_font )
+        
+        self.addtag_withtag('selection', t_id)
+        self.addtag_withtag('selection', place_id)
+        self.addtag_withtag('selection', arc_id)
+        self.addtag_withtag('selection', label_id)
+        
+        transition_id = self._get_transition_id(self._last_clicked_id)
+        self._connecting_t = self._petri_net.transitions[transition_id]
+        
+        self._adding_node_fn_id = self.bind('<Motion>', self._dragCallback, '+')
+        self._connecting_node_fn_id = self.bind('<Motion>', self._connecting_negated_place_to_transition, '+')
+    
     def _add_transition(self):
         self._state = 'adding_transition'
         self.grab_set()
@@ -2969,6 +3018,24 @@ class RulePNEditor(RegularPNEditor):
             self.unbind('<Motion>', self._connecting_node_fn_id)
             self.unbind('<Motion>', self._adding_node_fn_id)
     
+    def _finish_adding_nand(self, event):
+        try:
+            self.delete('selection')
+            self.delete('connecting_arc')
+            
+            p = OrPlace('NAND', self._last_point)
+            t = AndTransition('nand_t', p.position + Vec2(-80, 0))
+            self.add_place(p)
+            self.add_transition(t)
+            
+            self.add_arc(t, p)
+            self.add_arc(p, self._connecting_t, 0)
+        except Exception as e:
+            tkMessageBox.showerror('Creation Error', str(e))
+        finally:
+            self.unbind('<Motion>', self._connecting_node_fn_id)
+            self.unbind('<Motion>', self._adding_node_fn_id)
+    
     def _finish_adding_transition(self, event):
         try:
             self.delete('selection')
@@ -3009,6 +3076,7 @@ class RulePNEditor(RegularPNEditor):
         self.delete('selection')
         self.delete('connecting_arc')
         self.add_arc(p, self._connecting_t)
+        self.add_arc(self._connecting_t, p)
     
     def _add_negated_fact_arc(self, p):
         self.delete('selection')

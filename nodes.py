@@ -297,10 +297,21 @@ class PrimitiveTaskPlace(Place):
             raise Exception('TASK places cannot connect to a transition that is not of type SEQUENCE.')
         
         if target.__class__ in [PreconditionsTransition, RuleTransition] and self.petri_net.task != self.name:
-            raise Exception('Only the PRIMITIVE TASK Place corresponding to the task this rule belongs to is allowed to connect to a PRECONDITIONS or RULE Transition.')
+            raise Exception('Only the TASK place corresponding to the task this rule belongs to is allowed to connect to a PRECONDITIONS or RULE Transition.')
         
         if weight == 0:
             raise Exception('TASK places cannot connect with an inhibitor arc (weight == 0).')
+    
+    def _get_preconditions(self):
+        
+        pos = self.name.find('(')
+        if pos < 0:
+            return ['task', self.name, ""]
+        
+        name = self.name[:pos]
+        params = self.name[pos+1:-1].split(',')
+        return ['task', name, params]
+        
 
 class NonPrimitiveTaskPlace(PrimitiveTaskPlace):
     
@@ -313,7 +324,7 @@ class CommandPlace(Place):
     FILL_COLOR = '#99FF66'
     OUTLINE_COLOR = '#77DD44'
     PREFIX = 'cmd'
-    REGEX = re.compile(r'[a-zA-Z][a-zA-Z0-9_]*(\s*\(\s*((\?[a-zA-Z][a-zA-Z0-9_]*)|("[^"]*"))(\s*,\s*((\?[a-zA-Z][a-zA-Z0-9_]*)|("[^"]*"))){1,3}\s*\))?')
+    REGEX = re.compile(r'[a-zA-Z][a-zA-Z0-9_]*\s*\(\s*((\?[a-zA-Z][a-zA-Z0-9_]*)|("[^"]*"))\s*,\s*(\??[a-zA-Z][a-zA-Z0-9_]*)(\s*,\s*((\?[a-zA-Z][a-zA-Z0-9_]*)|([-]?[0-9]+(\.[0-9]+)?))){,2}\s*\)')
     
     def __init__(self, name, position=Vec2(), init_marking=0, capacity=1):
         super(CommandPlace, self).__init__(name, position=position, init_marking=init_marking, capacity=capacity)
@@ -330,13 +341,26 @@ class CommandPlace(Place):
         if not self.REGEX.match(val):
             raise Exception("A CommandPlace name should be a command name, followed by parameters that can either be a constant value or a bound variable.")
     
+    def _get_preconditions(self):
+        
+        pos = self.name.find('(')
+        if pos < 0:
+            raise Exception("Command with no arguments found!")
+        
+        name = self.name[:pos]
+        params = self.name[pos+1:-1].split(',')
+        if len(params) < 2:
+            raise Exception("Command with too few arguments found!")
+        
+        return ['command', name, params]
+    
 class FactPlace(Place):
     
     FILL_COLOR = '#4444FF'
     OUTLINE_COLOR = '#0000BB'
     PREFIX = 'fact'
     
-    REGEX = re.compile(r'[a-zA-Z][a-zA-Z0-9_]*(\s*\(\s*((\$?\?)|((\$?\?)?[a-zA-Z][a-zA-Z0-9_]*)|("[^"]*"))(\s*,\s*((\$?\?)|((\$?\?)?[a-zA-Z][a-zA-Z0-9_]*)|("[^"]*")))*\s*\))?')
+    REGEX = re.compile(r'[a-zA-Z][a-zA-Z0-9_]*(\s*\(\s*(([-]?[0-9]+(\.[0-9]+)?)|(\$?\?)|((\$?\?)?[a-zA-Z][a-zA-Z0-9_]*)|("[^"]*"))(\s*,\s*(([-]?[0-9]+(\.[0-9]+)?)|(\$?\?)|((\$?\?)?[a-zA-Z][a-zA-Z0-9_]*)|("[^"]*")))*\s*\))?')
     
     def __init__(self, name, position=Vec2(), init_marking=0, capacity=1):
         super(FactPlace, self).__init__(name, position=position, init_marking=init_marking, capacity=capacity)
@@ -355,13 +379,33 @@ class FactPlace(Place):
         if not self.REGEX.match(val):
             raise Exception("A FactPlace should be a command name, followed by parameters that can either be a constant value or a bound variable.")
     
+    def _get_preconditions(self):
+        
+        pos = self.name.find('(')
+        if pos < 0:
+            return ['fact', self.name]
+        
+        name = self.name[:pos]
+        params = self.name[pos+1:-1].split(',')
+        return ['fact', name, params]
+    
 class StructuredFactPlace(FactPlace):
     
     FILL_COLOR = '#CC0099'
     OUTLINE_COLOR = '#AA0077'
     PREFIX = 'sfact'
     
-    REGEX = re.compile(r'[a-zA-Z][a-zA-Z0-9_]*(\s*\(\s*[a-zA-Z][a-zA-Z0-9_]*\s*:\s*(((\$?\?)?[a-zA-Z][a-zA-Z0-9_]*)|("[^"]*"))(\s*,\s*[a-zA-Z][a-zA-Z0-9_]*\s*:\s*(((\$?\?)?[a-zA-Z][a-zA-Z0-9_]*)|("[^"]*")))*\s*\))?')
+    REGEX = re.compile(r'[a-zA-Z][a-zA-Z0-9_]*(\s*\(\s*[a-zA-Z][a-zA-Z0-9_]*\s*:\s*((([-]?[0-9]+(\.[0-9]+)?)|(\$?\?)?[a-zA-Z][a-zA-Z0-9_]*)|("[^"]*"))(\s*,\s*[a-zA-Z][a-zA-Z0-9_]*\s*:\s*(([-]?[0-9]+(\.[0-9]+)?)|((\$?\?)?[a-zA-Z][a-zA-Z0-9_]*)|("[^"]*")))*\s*\))?')
+    
+    def _get_preconditions(self):
+        
+        pos = self.name.find('(')
+        if pos < 0:
+            return ['sfact', self.name]
+        
+        name = self.name[:pos]
+        params = [p.split(':') for p in self.name[pos+1:-1].split(',')]
+        return ['sfact', name, params]
     
 class OrPlace(Place):
     
@@ -377,6 +421,32 @@ class OrPlace(Place):
         
         if target.__class__ == SequenceTransition:
             raise Exception('OR places cannot connect to a SEQUENCE transition.')
+    
+    def _get_preconditions(self):
+        
+        params = [el._get_preconditions() for el in self._incoming_arcs.values()]
+        
+        return ['or', params]
+    
+class NandPlace(Place):
+    
+    FILL_COLOR = '#88DDFF'
+    OUTLINE_COLOR = '#66BBDD'
+    PREFIX = 'nand'
+    
+    def __init__(self, name, position=Vec2(), init_marking=0, capacity=1):
+        super(NandPlace, self).__init__(name, position=position, init_marking=init_marking, capacity=capacity)
+    
+    def can_connect_to(self, target, weight):
+        super(NandPlace, self).can_connect_to(target, weight)
+        
+        if target.__class__ == SequenceTransition:
+            raise Exception('NAND places cannot connect to a SEQUENCE transition.')
+    
+    def _get_preconditions(self):
+        
+        #NAND places should only have one transition connected to them.
+        return self._incoming_arcs.values()[0]._get_preconditions()
     
 class TaskStatusPlace(Place):
     
@@ -401,6 +471,10 @@ class TaskStatusPlace(Place):
         
         if target.__class__ != RuleTransition:
             raise Exception('TASK_STATUS places cannot connect to any transition other than a RULE Transition.')
+    
+    def _get_preconditions(self):
+        
+        return ['task_status', self.name[self.name.find('(') + 1:-1]]
 
 PLACE_CLASSES = (Place,
                  NonPrimitiveTaskPlace,
@@ -649,6 +723,43 @@ class PreconditionsTransition(Transition):
         super(PreconditionsTransition, self).can_connect_to(target, weight)
         if target.__class__ in [CommandPlace, OrPlace]:
             raise Exception('PRECONDITIONS transitions cannot connect to a COMMAND or an OR place.')
+    
+    def _get_preconditions(self):
+        
+        incoming_arcs = self._incoming_arcs.values()
+        
+        first_arcs = ['active_task']
+        positive = []
+        negative = []
+        
+        for arc in incoming_arcs:
+            if arc.source.__class__ in [PrimitiveTaskPlace, NonPrimitiveTaskPlace]:
+                first_arcs.insert(0, arc.source._get_preconditions())
+                continue
+            if arc.source.__class__ in [FactPlace, StructuredFactPlace] and arc.weight > 0:
+                delete = True
+                if repr(arc.source) in self._outgoing_arcs:
+                    delete = False
+                positive.append([delete, arc.source._get_preconditions()])
+                continue
+            
+            if arc.source.__class__ is OrPlace and arc.weight > 0:
+                positive.append([False, arc.source._get_preconditions()])
+                continue
+            
+            if arc.source.__class__ in [FactPlace, StructuredFactPlace]:
+                negative.append(['not', arc.source._get_preconditions()])
+                continue
+            
+            if arc.source.__class__ is OrPlace:
+                negative.append(['not', arc.source._get_preconditions()])
+                continue
+            
+            if arc.source.__class__ is NandPlace:
+                negative.append(['not', arc.source._incoming_arcs.values()[0]._get_preconditions()])
+        
+        
+        return ['rule', first_arcs + positive + negative]
 
 class RuleTransition(Transition):
     
@@ -663,6 +774,46 @@ class RuleTransition(Transition):
         super(RuleTransition, self).can_connect_to(target, weight)
         if target.__class__ == OrPlace:
             raise Exception('RULE transitions cannot connect to OR places.')
+    
+    def _get_preconditions(self):
+        
+        incoming_arcs = self._incoming_arcs.values()
+        
+        first_arcs = ['active_task']
+        positive = []
+        negative = []
+        
+        for arc in incoming_arcs:
+            if arc.source.__class__ in [PrimitiveTaskPlace, NonPrimitiveTaskPlace]:
+                first_arcs.insert(0, arc.source._get_preconditions())
+                continue
+            # TODO: Handle Task_status and NOT Task_status for different rules.
+            if arc.source.__class__ is TaskStatusPlace:
+                first_arcs.append(arc.source._get_preconditions())
+                continue
+            if arc.source.__class__ in [FactPlace, StructuredFactPlace] and arc.weight > 0:
+                delete = True
+                if repr(arc.source) in self._outgoing_arcs:
+                    delete = False
+                positive.append([delete, arc.source._get_preconditions()])
+                continue
+            
+            if arc.source.__class__ is OrPlace and arc.weight > 0:
+                positive.append([False, arc.source._get_preconditions()])
+                continue
+            
+            if arc.source.__class__ in [FactPlace, StructuredFactPlace]:
+                negative.append(['not', arc.source._get_preconditions()])
+                continue
+            
+            if arc.source.__class__ is OrPlace:
+                negative.append(['not', arc.source._get_preconditions()])
+                continue
+            
+            if arc.source.__class__ is NandPlace:
+                negative.append(['not', arc.source._incoming_arcs.values()[0]._get_preconditions()])
+        
+        return ['rule', first_arcs + positive + negative]
     
 class AndTransition(Transition):
     
