@@ -1330,9 +1330,11 @@ class BasicPNEditor(Tkinter.Canvas):
                 return
         try:
             arc.source.can_connect_to(arc.target, new_weight)
+            self._petri_net._can_connect(arc.source, arc.target, new_weight)
         except Exception as e:
             tkMessageBox.showerror('Invalid weight.', str(e))
             return
+        
         self._add_to_undo(['set_weight', 'Set Arc weight.', arc, arc.weight])
         arc.weight = new_weight
         self._draw_arc(arc)
