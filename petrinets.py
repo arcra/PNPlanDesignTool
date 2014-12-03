@@ -161,6 +161,11 @@ class BasicPetriNet(object):
         
         return t
     
+    def _can_connect(self, source, target, weight):
+        
+        if weight < 0:
+            raise Exception('An arc cannot have a negative weight.')
+    
     def add_arc(self, source, target, weight = 1, _treeElement = None):
         """
         Adds an arc from 'source' to 'target' with weight 'weight'.
@@ -176,6 +181,9 @@ class BasicPetriNet(object):
         
         # Assert:
         source.can_connect_to(target, weight)
+        
+        # Assert:
+        self._can_connect(source, target, weight)
         
         if repr(target) in source._outgoing_arcs:
             return None
@@ -273,39 +281,33 @@ class BasicPetriNet(object):
             first_queue = [net]
             second_queue = []
             
+            #Since name clashes can occur, all nodes must be renamed after reading the file
+            # (i. e. after creating all nodes AND ARCS correctly).
+            renaming_places_dict = {}
+            renaming_transitions_dict = {}
+            
             while first_queue:
-                current = first_queue.pop()
+                current = first_queue.pop(0)
                 second_queue.append(current)
                 
                 for p_el in current.findall('place'):
                     p = Place.fromETreeElement(p_el)
                     pn.add_place(p)
-                    place_id = p_el.get('id')
-                    for e in net.findall('.//referencePlace[@ref="' + place_id + '"]'):
-                        e.set('ref', repr(p))
-                    for e in net.findall('.//arc[@source="' + place_id + '"]'):
-                        e.set('source', repr(p))
-                    for e in net.findall('.//arc[@target="' + place_id + '"]'):
-                        e.set('target', repr(p))
-                    p_el.set('id', repr(p))
+                    
+                    renaming_places_dict[p_el.get('id')] = repr(p)
+                    
                 for t_el in current.findall('transition'):
                     t = Transition.fromETreeElement(t_el)
                     pn.add_transition(t)
-                    transition_id = t_el.get('id')
-                    for e in net.findall('.//referenceTransition[@ref="' + transition_id + '"]'):
-                        e.set('ref', repr(t))
-                    for e in net.findall('.//arc[@source="' + transition_id + '"]'):
-                        e.set('source', repr(t))
-                    for e in net.findall('.//arc[@target="' + transition_id + '"]'):
-                        e.set('target', repr(t))
-                    t_el.set('id', repr(t))
+                    
+                    renaming_transitions_dict[t_el.get('id')] = repr(t)
                 
                 pages = current.findall('page')
                 if pages:
                     first_queue += pages
             
             while second_queue:
-                current = second_queue.pop()
+                current = second_queue.pop(0)
                 
                 for ref in net.findall('.//referencePlace'):
                     reference = ref
@@ -325,7 +327,8 @@ class BasicPetriNet(object):
                     for e in net.findall('.//arc[@target="' + place_id + '"]'):
                         e.set('target', new_id)
                     ref.set('id', new_id)
-                    pn.places[reference.get('id')]._references.add(new_id)
+                    #Translate old_id to new_id to set references correctly before renaming main node.
+                    pn.places[renaming_places_dict[reference.get('id')]]._references.add(new_id)
                 
                 for ref in net.findall('.//referenceTransition'):
                     reference = ref
@@ -337,7 +340,7 @@ class BasicPetriNet(object):
                     
                     transition_id = ref.get('id')
                     pn._transition_counter += 1
-                    new_id = 'P{:0>3d}'.format(pn._transition_counter)
+                    new_id = 'T{:0>3d}'.format(pn._transition_counter)
                     for e in net.findall('.//referenceTransition[@ref="' + transition_id + '"]'):
                         e.set('ref', new_id)
                     for e in net.findall('.//arc[@source="' + transition_id + '"]'):
@@ -345,7 +348,8 @@ class BasicPetriNet(object):
                     for e in net.findall('.//arc[@target="' + transition_id + '"]'):
                         e.set('target', new_id)
                     ref.set('id', new_id)
-                    pn.places[reference.get('id')]._references.add(new_id)
+                    #Translate old_id to new_id to set references correctly before renaming main node.
+                    pn.transitions[renaming_transitions_dict[reference.get('id')]]._references.add(new_id)
                 
                 for arc in current.findall('arc'):
                     source = net.find('.//*[@id="' + arc.get('source') + '"]')
@@ -363,18 +367,103 @@ class BasicPetriNet(object):
                         raise Exception("Referenced node '" + arc.get('target') + "' was not found.")
                     
                     if source.tag == 'place':
-                        source = pn.places[source.get('id')]
-                        target = pn.transitions[target.get('id')]
+                        source = pn.places[renaming_places_dict[source.get('id')]]
+                        target = pn.transitions[renaming_transitions_dict[target.get('id')]]
                     else:
-                        source = pn.transitions[source.get('id')]
-                        target = pn.places[target.get('id')]
+                        source = pn.transitions[renaming_transitions_dict[source.get('id')]]
+                        target = pn.places[renaming_places_dict[target.get('id')]]
                         
                     try:
                         weight = int(arc.find('inscription/text').text)
                     except:
                         weight = 1
                     pn.add_arc(source, target, weight, arc.get('id'))
+            
+            renaming_places = renaming_places_dict.items()
+            key = val = 'placebo'
+            while renaming_places and key == val:
+                key, val = renaming_places.pop(0)
+                renaming_places_dict.pop(key)
+            
+            if key != val:
+                new_key = val
+                while new_key in renaming_places_dict:
+                    new_key += 'a'
                 
+                renaming_places.append((new_key, val))
+                renaming_places_dict[new_key] = val
+                
+                p_el = net.find('.//place[@id="' + key + '"]')
+                for e in net.findall('.//referencePlace[@ref="' + key + '"]'):
+                    e.set('ref', new_key)
+                for e in net.findall('.//arc[@source="' + key + '"]'):
+                    e.set('source', new_key)
+                for e in net.findall('.//arc[@target="' + key + '"]'):
+                    e.set('target', new_key)
+                p_el.set('id', new_key)
+            
+            while renaming_places:
+                
+                key, val = renaming_places.pop(0)
+                
+                if val in renaming_places_dict:
+                    renaming_places.append((key, val))
+                    continue
+                
+                p_el = net.find('.//place[@id="' + key + '"]')
+                for e in net.findall('.//referencePlace[@ref="' + key + '"]'):
+                    e.set('ref', val)
+                for e in net.findall('.//arc[@source="' + key + '"]'):
+                    e.set('source', val)
+                for e in net.findall('.//arc[@target="' + key + '"]'):
+                    e.set('target', val)
+                p_el.set('id', val)
+                
+                del renaming_places_dict[key]
+                
+            
+            renaming_transitions = renaming_transitions_dict.items()
+            key = val = 'placebo'
+            while renaming_transitions and key == val:
+                key, val = renaming_transitions.pop(0)
+                renaming_transitions_dict.pop(key)
+            
+            if key != val:
+                new_key = val
+                while new_key in renaming_transitions_dict:
+                    new_key += 'a'
+                
+                renaming_transitions.append((new_key, val))
+                renaming_transitions_dict[new_key] = val
+                
+                t_el = net.find('.//transition[@id="' + key + '"]')
+                for e in net.findall('.//referenceTransition[@ref="' + key + '"]'):
+                    e.set('ref', new_key)
+                for e in net.findall('.//arc[@source="' + key + '"]'):
+                    e.set('source', new_key)
+                for e in net.findall('.//arc[@target="' + key + '"]'):
+                    e.set('target', new_key)
+                t_el.set('id', new_key)
+            
+            while renaming_transitions:
+                
+                key, val = renaming_transitions.pop(0)
+                
+                if val in renaming_transitions_dict:
+                    renaming_transitions.append((key, val))
+                    continue
+                
+                t_el = net.find('.//transition[@id="' + key + '"]')
+                for e in net.findall('.//referenceTransition[@ref="' + key + '"]'):
+                    e.set('ref', val)
+                for e in net.findall('.//arc[@source="' + key + '"]'):
+                    e.set('source', val)
+                for e in net.findall('.//arc[@target="' + key + '"]'):
+                    e.set('target', val)
+                t_el.set('id', val)
+                
+                del renaming_transitions_dict[key]
+            
             pnets.append(pn)
         
         return pnets
@@ -551,22 +640,11 @@ class RulePN(BasicPetriNet):
     def from_pnml_file(cls, filename, task):
         BasicPetriNet.from_pnml_file(filename, PetriNetClass = cls, task = task)
     
-    def get_CLIPS_code(self):
+    def get_clips_code(self):
         
-        preconditions = self._get_precondtions()
+        preconditions = self._main_transition._get_preconditions()
+        print preconditions
         
-        
-        
-        
-    def _get_preconditions(self):
-        
-        incoming_arcs = self._main_transition._incoming_arcs.values()
-        task_arc = incoming_arcs.pop(repr(self._main_place))
-        
-        return [
-                task_arc.source._get_preconditions(),
-                ['active_task']
-            ]
 
 class DecompositionPN(RulePN):
     
@@ -633,11 +711,22 @@ class FinalizationPN(RulePN):
         self.add_arc(p, t)
         self.add_arc(t, p)
     
+    def _can_connect(self, source, target, weight):
+        
+        if source.__class__ is TaskStatusPlace and weight == 0:
+            raise Exception("Finalization rules must have a TaskStatus place as precondition (i. e. its arc's weight must be one)")
+        
+        super(FinalizationPN, self)._can_connect(source, target, weight)
+    
     @classmethod
     def from_pnml_file(cls, filename, task):
         return BasicPetriNet.from_pnml_file(filename, PetriNetClass = cls, task = task)
 
 class CancelationPN(RulePN):
+    
+    def get_CLIPS_code(self):
+        
+        preconditions = self._main_transition._get_precondtions(is_cancelation = True)
     
     @classmethod
     def from_pnml_file(cls, filename, task):
