@@ -86,7 +86,7 @@ def NonNegativeFloatDialog(title, text, label, init_value = 0.0):
 class InfoDialog(object):
     
     def __init__(self, title, text):
-        super(InputDialog, self).__init__()
+        super(InfoDialog, self).__init__()
         
         self.window = tk.Toplevel()#takefocus = True)
         self.window.title(title)
