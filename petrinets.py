@@ -691,6 +691,7 @@ class RulePN(BasicPetriNet):
         return text
     
     def _get_func_text(self, lst):
+        # TODO: get function while checking func arguments recursively for functions.
         pass
     
     def _handle_task(self, lst):
