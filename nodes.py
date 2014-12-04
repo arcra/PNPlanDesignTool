@@ -884,7 +884,7 @@ class PreconditionsTransition(BaseRuleTransition):
         
         incoming_arcs = self._incoming_arcs.values()
         
-        preconditions = ['active_task', ['not', ['task_status', '?']], ['not', ['cancel_active_tasks']]]
+        preconditions = [['active_task'], ['not', ['task_status', '?']], ['not', ['cancel_active_tasks']]]
         initial = None
         edited = False
         while incoming_arcs:
@@ -962,7 +962,7 @@ class PreconditionsTransition(BaseRuleTransition):
             raise Exception('The following unbound variables were found: ' + ', '.join(self._unbound_vars) + '.')
         
         
-        return ['rule', preconditions]
+        return preconditions
     
     def _get_effects(self):
         
@@ -1005,7 +1005,7 @@ class RuleTransition(BaseRuleTransition):
         if is_cancelation:
             cancelation_precondition = ['cancel_active_tasks']
         
-        first_arcs = ['active_task', cancelation_precondition]
+        first_arcs = [['active_task'], cancelation_precondition]
         preconditions = []
         
         task_status = False
@@ -1096,7 +1096,7 @@ class RuleTransition(BaseRuleTransition):
         if not task_status:
             first_arcs.append(['not', ['task_status', '?']])
         
-        return ['rule', first_arcs + preconditions]
+        return first_arcs + preconditions
     
 class AndTransition(BaseRuleTransition):
     

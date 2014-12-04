@@ -405,6 +405,9 @@ class BasicPetriNet(object):
             while renaming_places:
                 
                 key, val = renaming_places.pop(0)
+                if key == val:
+                    del renaming_places_dict[key]
+                    continue
                 
                 if val in renaming_places_dict:
                     renaming_places.append((key, val))
@@ -448,6 +451,9 @@ class BasicPetriNet(object):
             while renaming_transitions:
                 
                 key, val = renaming_transitions.pop(0)
+                if key == val:
+                    del renaming_transitions_dict[key]
+                    continue
                 
                 if val in renaming_transitions_dict:
                     renaming_transitions.append((key, val))
@@ -557,18 +563,19 @@ class RulePN(BasicPetriNet):
         self._main_transition_ = None
         self._main_place_ = None
         self._to_delete = []
+        self._deleted_fact_count = 0
         
         self._preconditions_handlers = {'task': self._handle_task,
-                                'fact': self._handle_fact,
-                                'sfact': self._handle_sfact,
-                                'delete': self._handle_delete,
-                                'cmp': self._handle_cmp,
-                                'or' : self._handle_or,
-                                'not' : self._handle_not,
-                                'task_status' : lambda x: '(task_status ?pnpdt_task__ ' + x[1] + ')',
-                                'active_task' : lambda x: '(active_task ?pnpdt_task__)',
-                                'cancel_active_tasks' : lambda x: '(cancel_active_tasks)'
-                            }
+                                        'fact': self._handle_fact,
+                                        'sfact': self._handle_sfact,
+                                        'delete': self._handle_delete,
+                                        'cmp': self._handle_cmp,
+                                        'or' : self._handle_or,
+                                        'not' : self._handle_not,
+                                        'task_status' : lambda x: '(task_status ?pnpdt_task__ ' + x[1] + ')',
+                                        'active_task' : lambda x: '(active_task ?pnpdt_task__)',
+                                        'cancel_active_tasks' : lambda x: '(cancel_active_tasks)'
+                                    }
         
         super(RulePN, self).__init__(name, _net)
         
@@ -667,18 +674,24 @@ class RulePN(BasicPetriNet):
             (send-command "command" symbol "params" timeout attempts)
         '''
         
-        self._fact_count = 0
+        self._deleted_fact_count = 0
+        self._to_delete = []
         
         preconditions = self._main_transition._get_preconditions()
-        facts, tasks, commands = self._main_transition._get_effects()
+        #facts, tasks, commands = self._main_transition._get_effects()
         
-        rule = ['(defrule ' + self.task + '-' + self.name]
+        task = self.task
+        pos = self.task.find('(')
+        if pos > -1:
+            task = task[:pos]
+        
+        rule = ['(defrule ' + task + '-' + self.name]
         for el in preconditions:
             rule += self._indent(self._preconditions_handlers[el[0]](el))
         rule += self._indent('=>')
         rule += [')']
         
-        return rule
+        return '\n'.join(rule)
     
     def _indent(self, text):
         
@@ -691,21 +704,54 @@ class RulePN(BasicPetriNet):
         return text
     
     def _get_func_text(self, lst):
-        pass
+        text = '(' + lst[0]
+        
+        for arg in lst[1:]:
+            if arg in self._main_transition._func_dict:
+                arg = self._get_func_text(self._main_transition._func_dict[arg])
+            text += ' ' + arg
+        
+        text += ')'
     
     def _handle_task(self, lst):
-        pass
+        
+        text = ''
+        
+        for arg in lst[2]:
+            if arg in self._main_transition._func_dict:
+                arg = self._get_func_text(self._main_transition._func_dict[arg])
+            text += ' ' + arg 
+        
+        return '?pnpdt_task__ <-(task (plan ?pnpdt_planName__) (action_type {0}) (params{1}) (step ?pnpdt_step__ $?pnpdt_steps__) (parent ?pnpdt_p__)'.format(lst[1], text)
     
     def _handle_fact(self, lst):
-        pass
+        text = ''
+        
+        for arg in lst[2]:
+            if arg in self._main_transition._func_dict:
+                arg = self._get_func_text(self._main_transition._func_dict[arg])
+            text += ' ' + arg 
+        
+        return '({0}{1})'.format(lst[1], text)
     
     def _handle_sfact(self, lst):
-        pass
+        text = ''
+        
+        for p in lst[2]:
+            text = ' (' + p[0]
+            for arg in p[1]:
+                if arg in self._main_transition._func_dict:
+                    arg = self._get_func_text(self._main_transition._func_dict[arg])
+                text += ' ' + arg
+            text += ')'
+         
+        
+        return '({0}{1})'.format(lst[1], text)
     
     def _handle_delete(self, lst):
         el = lst[1]
-        self._fact_count += 1
-        var = '?pnpdt_f' + str(self._fact_count) + '__'
+        self._deleted_fact_count += 1
+        var = '?pnpdt_f' + str(self._deleted_fact_count) + '__'
         self._to_delete.append(var)
         
         fact_text = self._preconditions_handlers[el[0]](el)
@@ -727,12 +773,16 @@ class RulePN(BasicPetriNet):
         text = ['(or']
         text += self._indent(self._preconditions_handlers[el[0]](el))
         text += [')']
+        
+        return text
     
     def _handle_not(self, lst):
         el = lst[1]
         text = ['(not']
         text += self._indent(self._preconditions_handlers[el[0]](el))
         text += [')']
+        
+        return text
     
 
 class DecompositionPN(RulePN):
