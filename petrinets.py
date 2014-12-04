@@ -556,6 +556,19 @@ class RulePN(BasicPetriNet):
         
         self._main_transition_ = None
         self._main_place_ = None
+        self._to_delete = []
+        
+        self._preconditions_handlers = {'task': self._handle_task,
+                                'fact': self._handle_fact,
+                                'sfact': self._handle_sfact,
+                                'delete': self._handle_delete,
+                                'cmp': self._handle_cmp,
+                                'or' : self._handle_or,
+                                'not' : self._handle_not,
+                                'task_status' : lambda x: '(task_status ?pnpdt_task__ ' + x[1] + ')',
+                                'active_task' : lambda x: '(active_task ?pnpdt_task__)',
+                                'cancel_active_tasks' : lambda x: '(cancel_active_tasks)'
+                            }
         
         super(RulePN, self).__init__(name, _net)
         
@@ -642,9 +655,85 @@ class RulePN(BasicPetriNet):
     
     def get_clips_code(self):
         
-        preconditions = self._main_transition._get_preconditions()
-        print preconditions
+        '''
+        (rule task_name-rule_name
+            <preconditions>
+            =>
+            (retract <vars>)
+            (assert
+                <new_facts>
+                <task facts>
+            )
+            (send-command "command" symbol "params" timeout attempts)
+        '''
         
+        self._fact_count = 0
+        
+        preconditions = self._main_transition._get_preconditions()
+        facts, tasks, commands = self._main_transition._get_effects()
+        
+        rule = ['(defrule ' + self.task + '-' + self.name]
+        for el in preconditions:
+            rule += self._indent(self._preconditions_handlers[el[0]](el))
+        rule += self._indent('=>')
+        rule += [')']
+        
+        return rule
+    
+    def _indent(self, text):
+        
+        if isinstance(text, basestring):
+            return ['\t' + text]
+
+        for i in range(len(text)):
+            text[i] = '\t' + text[i]
+        
+        return text
+    
+    def _get_func_text(self, lst):
+        pass
+    
+    def _handle_task(self, lst):
+        pass
+    
+    def _handle_fact(self, lst):
+        pass
+    
+    def _handle_sfact(self, lst):
+        pass
+    
+    def _handle_delete(self, lst):
+        el = lst[1]
+        self._fact_count += 1
+        var = '?pnpdt_f' + str(self._fact_count) + '__'
+        self._to_delete.append(var)
+        
+        fact_text = self._preconditions_handlers[el[0]](el)
+        return var + ' <-' + fact_text
+    
+    def _handle_cmp(self, lst):
+        el = lst[1]
+        op1 = el[1]
+        if op1 in self._main_transition._func_dict:
+            op1 = self._get_func_text(self._main_transition._func_dict[op1])
+        op2 = el[2]
+        if op2 in self._main_transition._func_dict:
+            op2 = self._get_func_text(self._main_transition._func_dict[op2])
+        
+        return '(test ({0} {1} {2}))'.format(el[0], op1, op2)
+    
+    def _handle_or(self, lst):
+        el = lst[1]
+        text = ['(or']
+        text += self._indent(self._preconditions_handlers[el[0]](el))
+        text += [')']
+    
+    def _handle_not(self, lst):
+        el = lst[1]
+        text = ['(not']
+        text += self._indent(self._preconditions_handlers[el[0]](el))
+        text += [')']
+    
 
 class DecompositionPN(RulePN):
     

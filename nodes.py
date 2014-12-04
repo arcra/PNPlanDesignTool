@@ -287,7 +287,7 @@ class BaseFactPlace(Place):
     __metaclass__ = abc.ABCMeta
     
     REGEX = re.compile(r'(?P<name>[a-zA-Z][a-zA-Z0-9_]*)\s*(?P<parenthesis>(\(\s*(([-]?[0-9]+(\.[0-9]+)?)|(\$?\?)|((\$?\?)?[a-zA-Z][a-zA-Z0-9_]*)|("[^"]*"))(\s*,\s*(([-]?[0-9]+(\.[0-9]+)?)|(\$?\?)|((\$?\?)?[a-zA-Z][a-zA-Z0-9_]*)|("[^"]*")))*\s*\))?)')
-    PARAMS_REGEX = re.compile(r'[^\s,]+')
+    PARAMS_REGEX = re.compile(r'[^\s,][^\s,]*')
     VARS_REGEX = re.compile(r'\?[a-zA-Z][a-zA-Z0-9_]*')
     
     def _get_bound_vars(self):
@@ -318,7 +318,7 @@ class FactPlace(BaseFactPlace):
         if not self.REGEX.match(val):
             raise Exception("A FactPlace should be a command name, followed by parameters that can either be a constant value or a bound variable.")
     
-    def _get_preconditions(self):
+    def _get_description(self):
         
         m = self.REGEX.match(self.name)
         
@@ -329,15 +329,42 @@ class FactPlace(BaseFactPlace):
             params = self.PARAMS_REGEX.findall(parenthesis[1:-1])
         return ['fact', name, params]
     
+    def _get_effects(self):
+        return self._get_description()
+    
 class StructuredFactPlace(FactPlace):
     
     FILL_COLOR = '#CC0099'
     OUTLINE_COLOR = '#AA0077'
     PREFIX = 'sfact'
+    STRUTURED_PARAMS_REGEX = re.compile(r'(?P<name>[a-zA-Z][a-zA-Z0-9_]*)\s*:\s*(' + 
+                                    '(?P<single>(([-]?[0-9]+(\.[0-9]+)?)|((\$?\?)?[a-zA-Z][a-zA-Z0-9_]*)|("[^"]*")))|' + 
+                                    '(?P<multi>\(' +
+                                        '((\$?\?)|([-]?[0-9]+(\.[0-9]+)?)|((\$?\?)?[a-zA-Z][a-zA-Z0-9_]*)|("[^"]*"))' +  
+                                        '(\s*,\s*((\$?\?)|([-]?[0-9]+(\.[0-9]+)?)|((\$?\?)?[a-zA-Z][a-zA-Z0-9_]*)|("[^"]*")))*' +  
+                                    '\))' + 
+                                ')')
+    #I've created a MONSTER!!!!
+    REGEX = re.compile(r'(?P<name>[a-zA-Z][a-zA-Z0-9_]*)\s*(?P<parenthesis>(\(' + 
+                       '\s*[a-zA-Z][a-zA-Z0-9_]*\s*:' + 
+                       '\s*(' + 
+                            '(([-]?[0-9]+(\.[0-9]+)?)|((\$?\?)?[a-zA-Z][a-zA-Z0-9_]*)|("[^"]*"))|' + 
+                            '\(' +
+                                '((\$?\?)|([-]?[0-9]+(\.[0-9]+)?)|((\$?\?)?[a-zA-Z][a-zA-Z0-9_]*)|("[^"]*"))' +  
+                                '(\s*,\s*((\$?\?)|([-]?[0-9]+(\.[0-9]+)?)|((\$?\?)?[a-zA-Z][a-zA-Z0-9_]*)|("[^"]*")))*' +  
+                            '\)' + 
+                        ')' + 
+                        '(\s*,\s*[a-zA-Z][a-zA-Z0-9_]*\s*:' + 
+                       '\s*(' + 
+                            '(([-]?[0-9]+(\.[0-9]+)?)|((\$?\?)?[a-zA-Z][a-zA-Z0-9_]*)|("[^"]*"))|' + 
+                            '\(' +
+                                '((\$?\?)|([-]?[0-9]+(\.[0-9]+)?)|((\$?\?)?[a-zA-Z][a-zA-Z0-9_]*)|("[^"]*"))' +  
+                                '(\s*,\s*((\$?\?)|([-]?[0-9]+(\.[0-9]+)?)|((\$?\?)?[a-zA-Z][a-zA-Z0-9_]*)|("[^"]*")))*' +  
+                            '\)' + 
+                        '))*' + 
+                        '\s*\))?)')
     
-    REGEX = re.compile(r'(?P<name>[a-zA-Z][a-zA-Z0-9_]*)\s*(?P<parenthesis>(\(\s*[a-zA-Z][a-zA-Z0-9_]*\s*:\s*((([-]?[0-9]+(\.[0-9]+)?)|(\$?\?)?[a-zA-Z][a-zA-Z0-9_]*)|("[^"]*"))(\s*,\s*[a-zA-Z][a-zA-Z0-9_]*\s*:\s*(([-]?[0-9]+(\.[0-9]+)?)|((\$?\?)?[a-zA-Z][a-zA-Z0-9_]*)|("[^"]*")))*\s*\))?)')
-    
-    def _get_preconditions(self):
+    def _get_description(self):
         
         m = self.REGEX.match(self.name)
         
@@ -345,8 +372,16 @@ class StructuredFactPlace(FactPlace):
         parenthesis = m.group('parenthesis')
         params = []
         if parenthesis:
-            params = [ p.split(':') for p in self.PARAMS_REGEX.findall(parenthesis[1:-1])]
+            for m in self.STRUTURED_PARAMS_REGEX.finditer(parenthesis[1:-1]):
+                param_name = m.group('name')
+                if m.group('single'):
+                    params.append([param_name, [m.group('single')]])
+                else:
+                    params.append([param_name, self.PARAMS_REGEX.findall(m.group('multi')[1:-1])])
         return ['sfact', name, params]
+    
+    def _get_effects(self):
+        return self._get_description()
 
 class PrimitiveTaskPlace(BaseFactPlace):
     
@@ -365,7 +400,7 @@ class PrimitiveTaskPlace(BaseFactPlace):
         if weight == 0:
             raise Exception('TASK places cannot connect with an inhibitor arc (weight == 0).')
     
-    def _get_preconditions(self):
+    def _get_description(self):
         
         pos = self.name.find('(')
         if pos < 0:
@@ -398,7 +433,7 @@ class CommandPlace(BaseFactPlace):
         if not self.REGEX.match(val):
             raise Exception("A CommandPlace name should be a command name, followed by parameters that can either be a constant value or a bound variable.")
     
-    def _get_preconditions(self):
+    def _get_description(self):
         
         m = self.REGEX.match(self.name)
         
@@ -471,7 +506,7 @@ class ComparisonPlace(BaseFactPlace):
         if not self.REGEX.match(val):
             raise Exception("A COMPARISON Place must be named cmp(<operator>, <operand1>, <operand2>), where operator is one of: '>', '>=', '<', '<=', '=', '<>', 'eq' or 'neq' without the quotes.")
     
-    def _get_preconditions(self):
+    def _get_description(self):
         
         m = self.REGEX.match(self.name)
         
@@ -502,16 +537,16 @@ class OrPlace(BaseFactPlace):
         if val != 'OR':
             raise Exception('An OR Place must be named "OR".')
     
-    def _get_preconditions(self, bound_vars = None):
+    def _get_description(self, bound_vars = None):
         
         incoming_arcs = self._incoming_arcs.values()
         params = []
         
         for arc in incoming_arcs:
             if arc.weight == 1:
-                params.append(['not', arc.source._get_preconditions(bound_vars)])
+                params.append(['not', arc.source._get_description(bound_vars)])
             else:
-                params.append(arc.source._get_preconditions(bound_vars))
+                params.append(arc.source._get_description(bound_vars))
         
         return ['or', params]
     
@@ -543,10 +578,10 @@ class NandPlace(BaseFactPlace):
         if val != 'NAND':
             raise Exception('A NAND Place must be named "NAND".')
     
-    def _get_preconditions(self, bound_vars):
+    def _get_description(self, bound_vars):
         
         #NAND places should only have one transition connected to them.
-        return self._incoming_arcs.values()[0]._get_preconditions(bound_vars)
+        return self._incoming_arcs.values()[0]._get_description(bound_vars)
     
     def _get_bound_vars(self):
         
@@ -577,7 +612,7 @@ class TaskStatusPlace(BaseFactPlace):
         if target.__class__ != RuleTransition:
             raise Exception('TASK_STATUS places cannot connect to any transition other than a RULE Transition.')
     
-    def _get_preconditions(self):
+    def _get_description(self):
         
         return ['task_status', self.name[self.name.find('(') + 1:-1]]
     
@@ -860,7 +895,7 @@ class PreconditionsTransition(BaseRuleTransition):
             if arc.source.__class__ in [PrimitiveTaskPlace, NonPrimitiveTaskPlace]:
                 unbound_vars = (arc.source._get_unbound_vars() - self._bound_vars)
                 if not unbound_vars:
-                    preconditions.insert(0, arc.source._get_preconditions())
+                    preconditions.insert(0, arc.source._get_description())
                     edited = True
                     self._bound_vars |= arc.source._get_bound_vars()
             elif arc.source.__class__ in [FactPlace, StructuredFactPlace]:
@@ -868,32 +903,32 @@ class PreconditionsTransition(BaseRuleTransition):
                 if not unbound_vars:
                     if arc.weight > 0:
                         if repr(arc.source) not in self._outgoing_arcs:
-                            preconditions.append(['delete', arc.source._get_preconditions()])
+                            preconditions.append(['delete', arc.source._get_description()])
                         else:
-                            preconditions.append(arc.source._get_preconditions())
+                            preconditions.append(arc.source._get_description())
                     else:
-                        preconditions.append(['not', arc.source._get_preconditions()])
+                        preconditions.append(['not', arc.source._get_description()])
                     edited = True
                     self._bound_vars |= arc.source._get_bound_vars()
             elif arc.source.__class__ is OrPlace:
                 unbound_vars = (arc.source._get_unbound_vars() - self._bound_vars)
                 if not unbound_vars:
                     if arc.weight > 0:
-                        preconditions.append(arc.source._get_preconditions(self._bound_vars))
+                        preconditions.append(arc.source._get_description(self._bound_vars))
                     else:
-                        preconditions.append(['not', arc.source._get_preconditions(self._bound_vars)])
+                        preconditions.append(['not', arc.source._get_description(self._bound_vars)])
                     edited = True
                     self._bound_vars |= arc.source._get_bound_vars()
             elif arc.source.__class__ is NandPlace:
                 unbound_vars = (arc.source._get_unbound_vars() - self._bound_vars)
                 if not unbound_vars:
-                    preconditions.append(['not', arc.source._incoming_arcs.values()[0]._get_preconditions(self._bound_vars)])
+                    preconditions.append(['not', arc.source._incoming_arcs.values()[0]._get_description(self._bound_vars)])
                     edited = True
                     self._bound_vars |= arc.source._get_bound_vars()
             elif arc.source.__class__ is ComparisonPlace:
                 unbound_vars = (arc.source._get_unbound_vars() - self._bound_vars)
                 if not unbound_vars:
-                    preconditions.append(arc.source._get_preconditions())
+                    preconditions.append(arc.source._get_description())
                     edited = True
                     self._bound_vars |= arc.source._get_bound_vars()
             elif arc.source.__class__ is FunctionPlace:
@@ -928,6 +963,28 @@ class PreconditionsTransition(BaseRuleTransition):
         
         
         return ['rule', preconditions]
+    
+    def _get_effects(self):
+        
+        outgoing_arcs = self._outgoing_arcs.values()
+        
+        facts = []
+        tasks = []
+        commands = []
+        
+        for arc in outgoing_arcs:
+            
+            if arc.source.__class__ in [PrimitiveTaskPlace, NonPrimitiveTaskPlace]:
+                tasks.append(arc.source._get_description())
+            elif arc.source.__class__ in [FactPlace, StructuredFactPlace]:
+                facts.append(arc.source._get_description())
+            elif arc.source.__class__ is CommandPlace:
+                commands.append(arc.source._get_description())
+            else:
+                print 'Place was not parsed: ' + str(arc.source)
+        
+        return (facts, tasks, commands)
+        
 
 class RuleTransition(BaseRuleTransition):
     
@@ -963,13 +1020,13 @@ class RuleTransition(BaseRuleTransition):
             if arc.source.__class__ in [PrimitiveTaskPlace, NonPrimitiveTaskPlace]:
                 unbound_vars = (arc.source._get_unbound_vars() - self._bound_vars)
                 if not unbound_vars:
-                    first_arcs.insert(0, arc.source._get_preconditions())
+                    first_arcs.insert(0, arc.source._get_description())
                     edited = True
                     self._bound_vars |= arc.source._get_bound_vars()
             elif arc.source.__class__ is TaskStatusPlace:
                 unbound_vars = (arc.source._get_unbound_vars() - self._bound_vars)
                 if not unbound_vars:
-                    first_arcs.append(arc.source._get_preconditions())
+                    first_arcs.append(arc.source._get_description())
                     edited = True
                     task_status = True
                     self._bound_vars |= arc.source._get_bound_vars()
@@ -978,32 +1035,32 @@ class RuleTransition(BaseRuleTransition):
                 if not unbound_vars:
                     if arc.weight > 0:
                         if repr(arc.source) not in self._outgoing_arcs:
-                            preconditions.append(['delete', arc.source._get_preconditions()])
+                            preconditions.append(['delete', arc.source._get_description()])
                         else:
-                            preconditions.append(arc.source._get_preconditions())
+                            preconditions.append(arc.source._get_description())
                     else:
-                        preconditions.append(['not', arc.source._get_preconditions()])
+                        preconditions.append(['not', arc.source._get_description()])
                     edited = True
                     self._bound_vars |= arc.source._get_bound_vars()
             elif arc.source.__class__ is OrPlace:
                 unbound_vars = (arc.source._get_unbound_vars() - self._bound_vars)
                 if not unbound_vars:
                     if arc.weight > 0:
-                        preconditions.append(arc.source._get_preconditions())
+                        preconditions.append(arc.source._get_description())
                     else:
-                        preconditions.append(['not', arc.source._get_preconditions()])
+                        preconditions.append(['not', arc.source._get_description()])
                     edited = True
                     self._bound_vars |= arc.source._get_bound_vars()
             elif arc.source.__class__ is NandPlace:
                 unbound_vars = (arc.source._get_unbound_vars() - self._bound_vars)
                 if not unbound_vars:
-                    preconditions.append(['not', arc.source._incoming_arcs.values()[0]._get_preconditions()])
+                    preconditions.append(['not', arc.source._incoming_arcs.values()[0]._get_description()])
                     edited = True
                     self._bound_vars |= arc.source._get_bound_vars()
             elif arc.source.__class__ is ComparisonPlace:
                 unbound_vars = (arc.source._get_unbound_vars() - self._bound_vars)
                 if not unbound_vars:
-                    preconditions.append(arc.source._get_preconditions())
+                    preconditions.append(arc.source._get_description())
                     edited = True
                     self._bound_vars |= arc.source._get_bound_vars()
             elif arc.source.__class__ is FunctionPlace:
@@ -1052,7 +1109,7 @@ class AndTransition(BaseRuleTransition):
         if target.__class__ != OrPlace:
             raise Exception('AND transitions cannot connect to a place that is not an OR place.')
     
-    def _get_preconditions(self, bound_vars):
+    def _get_description(self, bound_vars):
         
         self._bound_vars = bound_vars[:]
         
@@ -1072,30 +1129,30 @@ class AndTransition(BaseRuleTransition):
                 unbound_vars = (arc.source._get_unbound_vars() - self._bound_vars)
                 if not unbound_vars:
                     if arc.weight > 0:
-                        preconditions.append(arc.source._get_preconditions())
+                        preconditions.append(arc.source._get_description())
                     else:
-                        preconditions.append(['not', arc.source._get_preconditions()])
+                        preconditions.append(['not', arc.source._get_description()])
                     edited = True
                     self._bound_vars |= arc.source._get_bound_vars()
             elif arc.source.__class__ is OrPlace:
                 unbound_vars = (arc.source._get_unbound_vars() - self._bound_vars)
                 if not unbound_vars:
                     if arc.weight > 0:
-                        preconditions.append(arc.source._get_preconditions(self._bound_vars))
+                        preconditions.append(arc.source._get_description(self._bound_vars))
                     else:
-                        preconditions.append(['not', arc.source._get_preconditions(self._bound_vars)])
+                        preconditions.append(['not', arc.source._get_description(self._bound_vars)])
                     edited = True
                     self._bound_vars |= arc.source._get_bound_vars()
             elif arc.source.__class__ is NandPlace:
                 unbound_vars = (arc.source._get_unbound_vars() - self._bound_vars)
                 if not unbound_vars:
-                    preconditions.append(['not', arc.source._incoming_arcs.values()[0]._get_preconditions(self._bound_vars)])
+                    preconditions.append(['not', arc.source._incoming_arcs.values()[0]._get_description(self._bound_vars)])
                     edited = True
                     self._bound_vars |= arc.source._get_bound_vars()
             elif arc.source.__class__ is ComparisonPlace:
                 unbound_vars = (arc.source._get_unbound_vars() - self._bound_vars)
                 if not unbound_vars:
-                    preconditions.append(arc.source._get_preconditions())
+                    preconditions.append(arc.source._get_description())
                     edited = True
                     self._bound_vars |= arc.source._get_bound_vars()
             elif arc.source.__class__ is FunctionPlace:
