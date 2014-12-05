@@ -882,6 +882,9 @@ class PreconditionsTransition(BaseRuleTransition):
     
     def _get_preconditions(self):
         
+        self._bound_vars = set()
+        self._unbound_vars = set()
+        
         incoming_arcs = self._incoming_arcs.values()
         
         preconditions = [['active_task'], ['not', ['task_status', '?']], ['not', ['cancel_active_tasks']]]
@@ -963,33 +966,9 @@ class PreconditionsTransition(BaseRuleTransition):
         
         
         return preconditions
-    
-    def _get_effects(self):
-        
-        outgoing_arcs = self._outgoing_arcs.values()
-        
-        facts = []
-        tasks = []
-        commands = []
-        
-        for arc in outgoing_arcs:
-            
-            if arc.source.__class__ in [PrimitiveTaskPlace, NonPrimitiveTaskPlace]:
-                tasks.append(arc.source._get_description())
-            elif arc.source.__class__ in [FactPlace, StructuredFactPlace]:
-                facts.append(arc.source._get_description())
-            elif arc.source.__class__ is CommandPlace:
-                commands.append(arc.source._get_description())
-            else:
-                print 'Place was not parsed: ' + str(arc.source)
-        
-        return (facts, tasks, commands)
-        
 
-class RuleTransition(BaseRuleTransition):
+class RuleTransition(PreconditionsTransition):
     
-    FILL_COLOR = '#444444'
-    OUTLINE_COLOR = '#444444'
     PREFIX = 'r'
     
     def can_connect_to(self, target, weight):
@@ -998,6 +977,9 @@ class RuleTransition(BaseRuleTransition):
             raise Exception('RULE transitions cannot connect to OR places.')
     
     def _get_preconditions(self, is_cancelation = False):
+        
+        self._bound_vars = set()
+        self._unbound_vars = set()
         
         incoming_arcs = self._incoming_arcs.values()
         
@@ -1026,7 +1008,11 @@ class RuleTransition(BaseRuleTransition):
             elif arc.source.__class__ is TaskStatusPlace:
                 unbound_vars = (arc.source._get_unbound_vars() - self._bound_vars)
                 if not unbound_vars:
-                    first_arcs.append(arc.source._get_description())
+                    if repr(arc.source) not in self._outgoing_arcs:
+                        first_arcs.append(['delete', arc.source._get_description()])
+                    else:
+                        first_arcs.append(arc.source._get_description())
+                    
                     edited = True
                     task_status = True
                     self._bound_vars |= arc.source._get_bound_vars()
@@ -1112,6 +1098,7 @@ class AndTransition(BaseRuleTransition):
     def _get_description(self, bound_vars):
         
         self._bound_vars = bound_vars[:]
+        self._unbound_vars = set()
         
         incoming_arcs = self._incoming_arcs.values()
         
@@ -1187,6 +1174,10 @@ class AndTransition(BaseRuleTransition):
         return ['and', preconditions]
     
     def _get_bound_vars(self):
+        
+        self._bound_vars = set()
+        self._unbound_vars = set()
+        
         incoming_arcs = self._incoming_arcs.values()
         
         initial = None
@@ -1244,6 +1235,9 @@ class AndTransition(BaseRuleTransition):
         return self._bound_vars
     
     def _get_unbound_vars(self):
+        
+        self._bound_vars = set()
+        self._unbound_vars = set()
         
         incoming_arcs = self._incoming_arcs.values()
         

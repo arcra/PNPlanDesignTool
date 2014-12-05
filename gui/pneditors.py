@@ -3124,7 +3124,7 @@ class CancelationPNEditor(RulePNEditor):
                                                                           ('Add Successful Place', self._add_successful),
                                                                           ('Add Failed Place', self._add_failed)
                                                                         ]
-        self._menus_dict[RuleTransition.__name__] = ['preconditions_operations', 'fact_operations', 'task_operations', 'command_operations', 'task_status_effect_operations', 'generic_transition_properties', 'generic_transition_connections']  # @UndefinedVariable
+        self._menus_dict[RuleTransition.__name__] = ['preconditions_operations', 'fact_operations', 'command_operations', 'task_status_effect_operations', 'generic_transition_properties', 'generic_transition_connections']  # @UndefinedVariable
         self._menus_dict[TaskStatusPlace.__name__] = ['task_status_operations']  # @UndefinedVariable
     
     
