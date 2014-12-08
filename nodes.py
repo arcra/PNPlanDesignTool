@@ -560,7 +560,11 @@ class OrPlace(BaseFactPlace):
         
         incoming_arcs = self._incoming_arcs.values()
         
-        return set([arc.source._get_unbound_vars() for arc in incoming_arcs])
+        unbound_vars = set()
+        for arc in incoming_arcs:
+            unbound_vars |= arc.source._get_unbound_vars()
+        
+        return unbound_vars
     
 class NandPlace(BaseFactPlace):
     
@@ -589,7 +593,7 @@ class NandPlace(BaseFactPlace):
     
     def _get_unbound_vars(self):
         
-        return set(self._incoming_arcs.values()[0]._get_unbound_vars())
+        return self._incoming_arcs.values()[0]._get_unbound_vars()
     
 class TaskStatusPlace(BaseFactPlace):
     
