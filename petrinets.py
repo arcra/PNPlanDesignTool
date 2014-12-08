@@ -11,7 +11,7 @@ import lxml.etree as ET
 
 from nodes import Place, Transition, PreconditionsTransition, _Arc, _get_treeElement,\
     RuleTransition, SequenceTransition, TaskStatusPlace, NonPrimitiveTaskPlace,\
-    PrimitiveTaskPlace
+    PrimitiveTaskPlace, FactPlace, StructuredFactPlace, CommandPlace
 from utils import Vec2
 
 class BasicPetriNet(object):
@@ -405,6 +405,9 @@ class BasicPetriNet(object):
             while renaming_places:
                 
                 key, val = renaming_places.pop(0)
+                if key == val:
+                    del renaming_places_dict[key]
+                    continue
                 
                 if val in renaming_places_dict:
                     renaming_places.append((key, val))
@@ -448,6 +451,9 @@ class BasicPetriNet(object):
             while renaming_transitions:
                 
                 key, val = renaming_transitions.pop(0)
+                if key == val:
+                    del renaming_transitions_dict[key]
+                    continue
                 
                 if val in renaming_transitions_dict:
                     renaming_transitions.append((key, val))
@@ -557,18 +563,26 @@ class RulePN(BasicPetriNet):
         self._main_transition_ = None
         self._main_place_ = None
         self._to_delete = []
+        self._deleted_fact_count = 0
         
         self._preconditions_handlers = {'task': self._handle_task,
-                                'fact': self._handle_fact,
-                                'sfact': self._handle_sfact,
-                                'delete': self._handle_delete,
-                                'cmp': self._handle_cmp,
-                                'or' : self._handle_or,
-                                'not' : self._handle_not,
-                                'task_status' : lambda x: '(task_status ?pnpdt_task__ ' + x[1] + ')',
-                                'active_task' : lambda x: '(active_task ?pnpdt_task__)',
-                                'cancel_active_tasks' : lambda x: '(cancel_active_tasks)'
-                            }
+                                        'fact': self._handle_fact,
+                                        'sfact': self._handle_sfact,
+                                        'delete': self._handle_delete,
+                                        'cmp': self._handle_cmp,
+                                        'or' : self._handle_or,
+                                        'not' : self._handle_not,
+                                        'task_status' : lambda x: '(task_status ?pnpdt_task__ ' + x[1] + ')',
+                                        'active_task' : lambda x: '(active_task ?pnpdt_task__)',
+                                        'cancel_active_tasks' : lambda x: '(cancel_active_tasks)'
+                                    }
+        
+        self._effects_handlers = {
+                                  'fact': self._handle_fact_effect,
+                                  'sfact': self._handle_sfact_effect,
+                                  'task': self._handle_task_effect,
+                                  'command': self._handle_command
+                                  }
         
         super(RulePN, self).__init__(name, _net)
         
@@ -653,7 +667,15 @@ class RulePN(BasicPetriNet):
     def from_pnml_file(cls, filename, task):
         BasicPetriNet.from_pnml_file(filename, PetriNetClass = cls, task = task)
     
-    def get_clips_code(self):
+    def add_arc(self, source, target, weight = 1, _treeElement = None):
+        
+        if isinstance(target, SequenceTransition) and len(target._incoming_arcs) > 0:
+            raise Exception('A Sequence Transition cannot have more than one task connected to it.\n\
+            If synchronization is needed, two hierarchy levels must be created.')
+        
+        return super(RulePN, self).add_arc(source, target, weight, _treeElement)
+    
+    def get_clips_code(self, is_cancelation = False):
         
         '''
         (rule task_name-rule_name
@@ -667,46 +689,97 @@ class RulePN(BasicPetriNet):
             (send-command "command" symbol "params" timeout attempts)
         '''
         
-        self._fact_count = 0
+        self._deleted_fact_count = 0
+        self._to_delete = []
         
-        preconditions = self._main_transition._get_preconditions()
-        facts, tasks, commands = self._main_transition._get_effects()
+        if is_cancelation:
+            preconditions = self._main_transition._get_preconditions(is_cancelation)
+        else:
+            preconditions = self._main_transition._get_preconditions()
+        facts, tasks, commands = self._get_effects()
         
-        rule = ['(defrule ' + self.task + '-' + self.name]
+        task = self.task
+        pos = self.task.find('(')
+        if pos > -1:
+            task = task[:pos]
+        
+        rule = ['(defrule ' + task + '-' + self.name]
         for el in preconditions:
             rule += self._indent(self._preconditions_handlers[el[0]](el))
         rule += self._indent('=>')
+        if self._to_delete:
+            rule += self._indent('(retract' + ' '.join(self._to_delete) + ')')
+        if facts or tasks:
+            rule += self._indent('(assert')
+            for f in facts:
+                rule += self._indent(self._effects_handlers[f[0]](f), 2)
+            for t in tasks:
+                rule += self._indent(self._effects_handlers[t[0]](t), 2)
+            rule += self._indent(')')
+        for c in commands:
+            rule += self._indent(self._effects_handlers[c[0]](c))
         rule += [')']
         
-        return rule
+        return '\n'.join(rule)
     
-    def _indent(self, text):
+    def _indent(self, text, times = 1):
         
         if isinstance(text, basestring):
-            return ['\t' + text]
+            return ['\t'*times + text]
 
         for i in range(len(text)):
-            text[i] = '\t' + text[i]
+            text[i] = '\t'*times + text[i]
         
         return text
     
     def _get_func_text(self, lst):
-        # TODO: get function while checking func arguments recursively for functions.
-        pass
+        text = '(' + lst[0]
+        
+        for arg in lst[1:]:
+            if arg in self._main_transition._func_dict:
+                arg = self._get_func_text(self._main_transition._func_dict[arg])
+            text += ' ' + arg
+        
+        text += ')'
     
     def _handle_task(self, lst):
-        pass
+        
+        text = ''
+        
+        for arg in lst[2]:
+            if arg in self._main_transition._func_dict:
+                arg = self._get_func_text(self._main_transition._func_dict[arg])
+            text += ' ' + arg 
+        
+        return '?pnpdt_task__ <-(task (plan ?pnpdt_planName__) (action_type {0}) (params{1}) (step ?pnpdt_step__ $?pnpdt_steps__) (parent ?pnpdt_parent__)'.format(lst[1], text)
     
     def _handle_fact(self, lst):
-        pass
+        text = ''
+        
+        for arg in lst[2]:
+            if arg in self._main_transition._func_dict:
+                arg = self._get_func_text(self._main_transition._func_dict[arg])
+            text += ' ' + arg 
+        
+        return '({0}{1})'.format(lst[1], text)
     
     def _handle_sfact(self, lst):
-        pass
+        text = ''
+        
+        for p in lst[2]:
+            text = ' (' + p[0]
+            for arg in p[1]:
+                if arg in self._main_transition._func_dict:
+                    arg = self._get_func_text(self._main_transition._func_dict[arg])
+                text += ' ' + arg
+            text += ')'
+        
+        return '({0}{1})'.format(lst[1], text)
     
     def _handle_delete(self, lst):
         el = lst[1]
-        self._fact_count += 1
-        var = '?pnpdt_f' + str(self._fact_count) + '__'
+        self._deleted_fact_count += 1
+        var = '?pnpdt_f' + str(self._deleted_fact_count) + '__'
         self._to_delete.append(var)
         
         fact_text = self._preconditions_handlers[el[0]](el)
@@ -728,13 +801,116 @@ class RulePN(BasicPetriNet):
         text = ['(or']
         text += self._indent(self._preconditions_handlers[el[0]](el))
         text += [')']
+        
+        return text
     
     def _handle_not(self, lst):
         el = lst[1]
         text = ['(not']
         text += self._indent(self._preconditions_handlers[el[0]](el))
         text += [')']
+        
+        return text
     
+    def _handle_fact_effect(self, lst):
+        text = ''
+        
+        for arg in lst[2]:
+            if arg in self._main_transition._func_dict:
+                arg = self._get_func_text(self._main_transition._func_dict[arg])
+            elif arg in ['?', '$?']:
+                raise Exception('Produced facts cannot have wildcards in them, they must be bound variables.')
+            text += ' ' + arg 
+        
+        return '({0}{1})'.format(lst[1], text)
+                                  
+    def _handle_sfact_effect(self, lst):
+        text = ''
+        
+        for p in lst[2]:
+            text = ' (' + p[0]
+            for arg in p[1]:
+                if arg in self._main_transition._func_dict:
+                    arg = self._get_func_text(self._main_transition._func_dict[arg])
+                elif arg in ['?', '$?']:
+                    raise Exception('Produced facts cannot have wildcards in them, they must be bound variables.')
+                text += ' ' + arg
+            text += ')'
+        
+        return '({0}{1})'.format(lst[1], text)
+                                  
+    def _handle_task_effect(self, lst):
+        text = ''
+        
+        for arg in lst[2]:
+            if arg in self._main_transition._func_dict:
+                arg = self._get_func_text(self._main_transition._func_dict[arg])
+            text += ' ' + arg 
+        
+        if lst[3] < 0:
+            parent = '?pnpdt_parent__'
+            step = '(- ?pnpdt_step__ ' + str(lst[3]*-1) + ')'
+        else:
+            parent = '?pnpdt_task__'
+            step = str(lst[3]) + ' ?pnpdt_step__'
+        
+        return '(task (plan ?pnpdt_planName__) (action_type {0}) (params{1}) (step {2} $?pnpdt_steps__) (parent {3})'.format(lst[1], text, step, parent)
+                                  
+    def _handle_command(self, lst):
+        text = ''
+        
+        for arg in lst[2]:
+            if arg in self._main_transition._func_dict:
+                arg = self._get_func_text(self._main_transition._func_dict[arg])
+            text += ' ' + arg 
+        
+        return '(send-command "{0}" {1})'.format(lst[1], text)
+    
+    def _get_effects(self):
+        
+        outgoing_arcs = self._main_transition._outgoing_arcs.values()
+        
+        facts = []
+        tasks = []
+        commands = []
+        
+        for arc in outgoing_arcs:
+            
+            if repr(arc.target) in self._main_transition._incoming_arcs:
+                continue
+            
+            if arc.target.__class__ in [PrimitiveTaskPlace, NonPrimitiveTaskPlace]:
+                tasks += self._get_task_effects(arc)
+            elif arc.target.__class__ in [FactPlace, StructuredFactPlace]:
+                facts.append(arc.target._get_description())
+            elif arc.target.__class__ is CommandPlace:
+                commands.append(arc.target._get_description())
+            else:
+                print 'Place was not parsed: ' + str(arc.target)
+        
+        return (facts, tasks, commands)
+    
+    def _get_task_effects(self, arc):
+        
+        offset = 0
+        
+        arcs = [arc]
+        tasks = []
+        
+        while arcs:
+            offset += 1
+            for arc in arcs:
+                t = arc.target._get_description()
+                t.append(offset)
+                tasks.append(t)
+            arcs2 = []
+            for arc in arcs:
+                #There should be only ONE sequence transition next to each task.
+                t = arc.target._outgoing_arcs.values()[0].target
+                arcs2 += t._outgoing_arcs.values()
+            arcs = arcs2
+        
+        return tasks
 
 class DecompositionPN(RulePN):
     
@@ -765,15 +941,6 @@ class DecompositionPN(RulePN):
     def from_pnml_file(cls, filename, task):
         
         return BasicPetriNet.from_pnml_file(filename, PetriNetClass = cls, task = task)
-    
-    def add_arc(self, source, target, weight = 1, _treeElement = None):
-        
-        #Assert
-        if isinstance(target, SequenceTransition) and len(target._incoming_arcs) > 0:
-            raise Exception('A Sequence Transition cannot have more than one tasks connected to it.\n\
-            If synchronization is needed, two hierarchy levels must be created.')
-        
-        return super(DecompositionPN, self).add_arc(source, target, weight, _treeElement)
 
 class ExecutionPN(RulePN):
     
@@ -784,11 +951,35 @@ class ExecutionPN(RulePN):
     @classmethod
     def from_pnml_file(cls, filename, task):
         return BasicPetriNet.from_pnml_file(filename, PetriNetClass = cls, task = task)
+    
+    def _get_task_effects(self, arc):
+        
+        offset = -1
+        
+        arcs = [arc]
+        tasks = []
+        
+        while arcs:
+            offset += 1
+            for arc in arcs:
+                t = arc.target._get_description()
+                t.append(offset)
+                tasks.append(t)
+            arcs2 = []
+            for arc in arcs:
+                #There should be only ONE sequence transition next to each task.
+                t = arc.target._outgoing_arcs.values()[0].target
+                arcs2 += t._outgoing_arcs.values()
+            arcs = arcs2
+        
+        for t in tasks:
+            t[3] -= offset
+        
+        return tasks
 
 class FinalizationPN(RulePN):
     
     def __init__(self, name, task, is_primitive_task = None, _net = None):
-        
         super(FinalizationPN, self).__init__(name, task, is_primitive_task, _net)
     
     def _initialize(self):
@@ -816,7 +1007,7 @@ class CancelationPN(RulePN):
     
     def get_CLIPS_code(self):
         
-        preconditions = self._main_transition._get_precondtions(is_cancelation = True)
+        return super(CancelationPN, self).get_clips_code(is_cancelation = True)
     
     @classmethod
     def from_pnml_file(cls, filename, task):

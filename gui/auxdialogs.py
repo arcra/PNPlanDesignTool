@@ -93,8 +93,8 @@ class InfoDialog(object):
         
         self.window.bind('<KeyPress-Return>', self.ok_callback)
         
-        self.text = tk.Label(self.window, text = text)
-        self.text.grid(row = 0, column = 0, sticky = tk.NW)
+        self.text = tk.Label(self.window, text = text, justify = tk.LEFT)
+        self.text.grid(row = 0, column = 0, columnspan = 3, sticky = tk.NW)
         
         self.ok_button = tk.Button(self.window, text = 'Ok', command = self.ok_callback)
         self.ok_button.grid(row = 1, column = 2)
