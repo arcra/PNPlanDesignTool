@@ -136,7 +136,7 @@ class PNPDT(object):
         self.petri_net_menu.add_command(label = 'Open', command = self.open_petri_net)
         self.petri_net_menu.add_command(label = 'Rename', command = self.rename_petri_net)
         self.petri_net_menu.add_command(label = 'Delete', command = self.delete_petri_net)
-        self.petri_net_menu.add_command(label = 'View CLIPS code', command = self.view_CLIPS_code)
+        self.petri_net_menu.add_command(label = 'View CLIPS code', command = self.view_clips_code)
         self.petri_net_menu.add_command(label = 'Export Rule to PNML', command = self.export_to_PNML)
         
         right_click_tag_bindings = {
@@ -668,7 +668,7 @@ class PNPDT(object):
         self.project_tree.delete(item)
         return pne, tab_open
     
-    def view_CLIPS_code(self):
+    def view_clips_code(self):
         
         item_tags = self.project_tree.item(self.clicked_element, 'tags')
         task_name = ''
@@ -678,7 +678,11 @@ class PNPDT(object):
                 break
         rule_name = os.path.basename(self.clicked_element)
         
-        clips_code = self.petri_nets[self.clicked_element]._petri_net.get_clips_code()
+        try:
+            clips_code = self.petri_nets[self.clicked_element]._petri_net.get_clips_code()
+        except Exception as e:
+            tkMessageBox.showerror('Invalid rule', str(e))
+            return
         
         dialog = InfoDialog('CLIPS code - ' + task_name + ' - ' + rule_name , clips_code)
         

@@ -290,7 +290,7 @@ class BaseFactPlace(Place):
     PARAMS_REGEX = re.compile(r'[^\s,][^\s,]*')
     VARS_REGEX = re.compile(r'\?[a-zA-Z][a-zA-Z0-9_]*')
     
-    def _get_bound_vars(self):
+    def _get_vars(self):
         m = self.REGEX.match(self.name)
         
         parenthesis = m.group('parenthesis')
@@ -298,8 +298,12 @@ class BaseFactPlace(Place):
             return set()
         return set(self.VARS_REGEX.findall(parenthesis[1:-1]))
     
+    def _get_bound_vars(self):
+        return self._get_vars()
+    
     def _get_unbound_vars(self):
         return set()
+    
 
 class FactPlace(BaseFactPlace):
     
@@ -444,14 +448,16 @@ class CommandPlace(BaseFactPlace):
             raise Exception("Command with too few arguments found!")
         return ['command', name, params]
     
+    def _get_vars(self):
+        m = self.REGEX.match(self.name)
+        parenthesis = m.group('parenthesis')
+        return set(self.VARS_REGEX.findall(parenthesis[1:-1]))
+    
     def _get_bound_vars(self):
         return set()
     
     def _get_unbound_vars(self):
-        
-        m = self.REGEX.match(self.name)
-        parenthesis = m.group('parenthesis')
-        return set(self.VARS_REGEX.findall(parenthesis[1:-1]))
+        return self._get_vars()
         
 
 class FunctionPlace(BaseFactPlace):

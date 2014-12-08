@@ -873,11 +873,14 @@ class RulePN(BasicPetriNet):
         facts = []
         tasks = []
         commands = []
+        unbound_vars = set()
         
         for arc in outgoing_arcs:
             
             if repr(arc.target) in self._main_transition._incoming_arcs:
                 continue
+            
+            unbound_vars |= (arc.target._get_vars() - self._main_transition._bound_vars)
             
             if arc.target.__class__ in [PrimitiveTaskPlace, NonPrimitiveTaskPlace]:
                 tasks += self._get_task_effects(arc)
@@ -887,6 +890,9 @@ class RulePN(BasicPetriNet):
                 commands.append(arc.target._get_description())
             else:
                 print 'Place was not parsed: ' + str(arc.target)
+        
+        if unbound_vars:
+            raise Exception('The following unbound variables were found: ' + ', '.join(unbound_vars) + '.')
         
         return (facts, tasks, commands)
     
