@@ -748,7 +748,7 @@ class RulePN(BasicPetriNet):
         
         for arg in lst[2]:
             if arg in self._main_transition._func_dict:
-                arg = self._get_func_text(self._main_transition._func_dict[arg])
+                arg = '=' + self._get_func_text(self._main_transition._func_dict[arg])
             text += ' ' + arg 
         
         return '?pnpdt_task__ <-(task (plan ?pnpdt_planName__) (action_type {0}) (params{1}) (step ?pnpdt_step__ $?pnpdt_steps__) (parent ?pnpdt_parent__)'.format(lst[1], text)
@@ -758,7 +758,7 @@ class RulePN(BasicPetriNet):
         
         for arg in lst[2]:
             if arg in self._main_transition._func_dict:
-                arg = self._get_func_text(self._main_transition._func_dict[arg])
+                arg = '=' + self._get_func_text(self._main_transition._func_dict[arg])
             text += ' ' + arg 
         
         return '({0}{1})'.format(lst[1], text)
@@ -770,7 +770,7 @@ class RulePN(BasicPetriNet):
             text = ' (' + p[0]
             for arg in p[1]:
                 if arg in self._main_transition._func_dict:
-                    arg = self._get_func_text(self._main_transition._func_dict[arg])
+                    arg = '=' + self._get_func_text(self._main_transition._func_dict[arg])
                 text += ' ' + arg
             text += ')'
         
