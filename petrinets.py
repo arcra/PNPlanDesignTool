@@ -581,7 +581,8 @@ class RulePN(BasicPetriNet):
                                   'fact': self._handle_fact_effect,
                                   'sfact': self._handle_sfact_effect,
                                   'task': self._handle_task_effect,
-                                  'command': self._handle_command
+                                  'command': self._handle_command,
+                                  'task_status' : self._handle_task_status_effect
                                   }
         
         super(RulePN, self).__init__(name, _net)
@@ -865,6 +866,13 @@ class RulePN(BasicPetriNet):
             text += ' ' + arg 
         
         return '(send-command "{0}" {1})'.format(lst[1], text)
+    
+    def _handle_task_status_effect(self, lst):
+        
+        if lst[1] == '?':
+            raise Exception('A TASK STATUS Place that is an effect of a rule cannot have a wildcard as a parameter.')
+        
+        return '(task_status ?pnpdt_task__ {0})'.format(lst[1])
     
     def _get_effects(self):
         
