@@ -3,23 +3,23 @@
 @author: Adrián Revuelta Cuauhtli
 """
 
-import sys
-import os
-sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
-
 import Tkinter
 import tkFileDialog
 import tkMessageBox
 
-from PetriNets import PetriNet
-from PNEditor import PNEditor
+import sys
+import os
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+
+from petrinets import BasicPetriNet
+from pneditors import RegularPNEditor
 
 class testWindow(object):
     
     def __init__(self):
         super(testWindow, self).__init__()
         self.root = Tkinter.Tk()
-        self.root.wm_title('PetriNet Lab - Test window')
+        self.root.wm_title('PNPDT - Test window')
         self.root.rowconfigure(0, weight = 1)
         self.root.columnconfigure(0, weight = 1)
         
@@ -33,7 +33,7 @@ class testWindow(object):
 #        self.pn.add_arc(p1, t)
 #        self.pn.add_arc(t, p2)
     
-        self.pne = PNEditor(self.root, width=600, height=400, grid = True, name = 'test')
+        self.pne = RegularPNEditor(self.root, width=600, height=400, grid = True, name = 'test')
         #self.pne.disable()
         self.pne.bind('<Motion>', self.cursor_callback)
         self.pne.grid(row = 0, column = 0, sticky = Tkinter.NSEW)
@@ -78,7 +78,7 @@ class testWindow(object):
         if not filename:
             return
         try:
-            petri_nets = PetriNet.from_pnml_file(filename)
+            petri_nets = BasicPetriNet.from_pnml_file(filename)
         except Exception as e:
             tkMessageBox.showerror('Error reading PNML file.', 'An error occurred while reading the PNML file.\n\n' + str(e))
             return
