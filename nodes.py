@@ -41,7 +41,7 @@ class Node(object):
             """
         
         if not name:
-            raise Exception('A Node name must be a non-empty string.')
+            name = self._get_new_node_name()
         
         self.name = name
         self.petri_net = None
@@ -51,6 +51,10 @@ class Node(object):
         self.hasTreeElement = False
         self._references = set()
         self._id = name.replace(' ', '_').replace('(', '__').replace(')', '__').replace(',', '_')
+    
+    @classmethod
+    def _get_new_node_name(cls):
+        return 'new_node'
     
     @property
     def name(self):
@@ -428,6 +432,10 @@ class CommandPlace(BaseFactPlace):
     PREFIX = 'cmd'
     REGEX = re.compile(r'(?P<name>[a-zA-Z][a-zA-Z0-9_]*)\s*(?P<parenthesis>(\(\s*((\?[a-zA-Z][a-zA-Z0-9_]*)|("[^"]*"))\s*,\s*(\??[a-zA-Z][a-zA-Z0-9_]*)(\s*,\s*((\?[a-zA-Z][a-zA-Z0-9_]*)|([0-9]+))){0,2}\s*\)))')
     
+    @classmethod
+    def _get_new_node_name(cls):
+        return 'new_command("args", symbol)'
+    
     def can_connect_to(self, target, weight):
         super(CommandPlace, self).can_connect_to(target, weight)
         raise Exception('COMMAND places cannot connect to any transition.')
@@ -435,7 +443,7 @@ class CommandPlace(BaseFactPlace):
     def _validate_name(self, val):
         #Assert
         if not self.REGEX.match(val):
-            raise Exception("A CommandPlace name should be a command name, followed by parameters that can either be a constant value or a bound variable.")
+            raise Exception("A CommandPlace name should be a command name, followed by a string of parameters or a bound variable, and by a symbol.")
     
     def _get_description(self):
         
@@ -608,8 +616,9 @@ class TaskStatusPlace(BaseFactPlace):
     PREFIX = 'ts'
     REGEX = re.compile(r'task_status\(((successful)|(failed)|(\?)|(\?[a-z-A-Z][a-z-A-Z0-9_-]*))\)')
     
-    def __init__(self, name, position=Vec2(), init_marking=0, capacity=1):
-        super(TaskStatusPlace, self).__init__(name, position=position, init_marking=init_marking, capacity=capacity)
+    @classmethod
+    def _get_new_node_name(cls):
+        return 'task_status(?)'
     
     def _validate_name(self, val):
         #Assert
@@ -887,8 +896,8 @@ class PreconditionsTransition(BaseRuleTransition):
         
     def can_connect_to(self, target, weight):
         super(PreconditionsTransition, self).can_connect_to(target, weight)
-        if target.__class__ in [CommandPlace, OrPlace]:
-            raise Exception('PRECONDITIONS transitions cannot connect to a COMMAND or an OR place.')
+        if target.__class__ is OrPlace:
+            raise Exception('PRECONDITIONS transitions cannot connect to an OR place.')
     
     def _get_preconditions(self):
         

@@ -1441,7 +1441,7 @@ class BasicPNEditor(Tkinter.Canvas):
         self._hide_menu()
         self._create_place(PlaceClass = Place)
         
-    def _create_place(self, PlaceClass, point = None, afterFunction = None, afterCancelFunction = None):
+    def _create_place(self, PlaceClass, point = None, afterFunction = None, afterCancelFunction = None, initial_name = None):
         """Creates a Place object, draws it and sets the label entry for entering the name."""
         
         if not point:
@@ -1468,7 +1468,7 @@ class BasicPNEditor(Tkinter.Canvas):
             point += diff
         
         canvas_id = self._draw_place_item(point, PlaceClass = PlaceClass)
-        p = PlaceClass('P{0:0>3d}'.format(self._petri_net._place_counter + 1), point)
+        p = PlaceClass(initial_name, point)
         
         txtbox = Tkinter.Entry(self)
         txtbox.insert(0, str(p))
@@ -3166,8 +3166,6 @@ class CancelationPNEditor(RulePNEditor):
     
     def _finish_adding_task_status(self, event):
         try:
-            self._create_place(TaskStatusPlace, afterFunction = self._add_simple_place_arc, afterCancelFunction = self._cancel_create_place)
-            
             pos = Vec2(event.x, event.y)
             
             status = 'failed'
