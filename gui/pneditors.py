@@ -153,7 +153,7 @@ class BasicPNEditor(Tkinter.Canvas):
         self._menus_options_sets_dict = {
                                        'canvas' : [
                                                    ('Add Place', self._create_regular_place),
-                                                   ('Add Transition', self._create_regular_place)
+                                                   ('Add Transition', self._create_regular_transition)
                                                 ],
                                        'pneditor_widget_options' : [
                                                                     ('Toggle grid', self._toggle_grid),
