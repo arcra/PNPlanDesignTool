@@ -693,10 +693,7 @@ class RulePN(BasicPetriNet):
         self._deleted_fact_count = 0
         self._to_delete = []
         
-        if is_cancelation:
-            preconditions = self._main_transition._get_preconditions(is_cancelation)
-        else:
-            preconditions = self._main_transition._get_preconditions()
+        preconditions = self._main_transition._get_preconditions(is_cancelation)
         facts, tasks, commands = self._get_effects()
         
         task = self.task

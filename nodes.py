@@ -467,6 +467,37 @@ class CommandPlace(BaseFactPlace):
     def _get_unbound_vars(self):
         return self._get_vars()
         
+class TaskStatusPlace(BaseFactPlace):
+    
+    FILL_COLOR = '#994400'
+    OUTLINE_COLOR = '#550000'
+    PREFIX = 'ts'
+    REGEX = re.compile(r'task_status\(((successful)|(failed)|(\?)|(\?[a-z-A-Z][a-z-A-Z0-9_-]*))\)')
+    
+    @classmethod
+    def _get_new_node_name(cls):
+        return 'task_status(?)'
+    
+    def _validate_name(self, val):
+        #Assert
+        if not self.REGEX.match(val):
+            raise Exception("A Task Status Place should have as parameter either one of the constants 'successful' and 'failed', or a variable.")
+    
+    def can_connect_to(self, target, weight):
+        super(TaskStatusPlace, self).can_connect_to(target, weight)
+        
+        if target.__class__ != RuleTransition:
+            raise Exception('TASK_STATUS places cannot connect to any transition other than a RULE Transition.')
+    
+    def _get_description(self):
+        
+        return ['task_status', self.name[self.name.find('(') + 1:-1]]
+    
+    def _get_bound_vars(self):
+        return set()
+    
+    def _get_unbound_vars(self):
+        return set()
 
 class FunctionPlace(BaseFactPlace):
     
@@ -474,6 +505,10 @@ class FunctionPlace(BaseFactPlace):
     OUTLINE_COLOR = '#44AA00'
     PREFIX = 'fnc'
     REGEX = re.compile(r'fnc\s*\(\s*(?P<func>[^\s,]+)(?P<args>(\s*,\s*(([-]?[0-9]+(\.[0-9]+)?)|(\??[a-zA-Z][a-zA-Z0-9_]*)|("[^"]*")))+)\s*,\s*(?P<result>(\?[a-zA-Z][a-zA-Z0-9_]*))\s*\)')
+    
+    @classmethod
+    def _get_new_node_name(cls):
+        return 'fnc(func_name, op1, op2, ?result)'
     
     def can_connect_to(self, target, weight):
         super(FunctionPlace, self).can_connect_to(target, weight)
@@ -508,6 +543,10 @@ class ComparisonPlace(BaseFactPlace):
     PREFIX = 'cmp'
     #NOTE: if regex (list of operators) changes, change exception messages.
     REGEX = re.compile(r'cmp\s*\(\s*(?P<operator>((>)|(>=)|(<)|(<=)|(=)|(<>)|(eq)|(neq)))\s*,\s*(?P<op1>(([-]?[0-9]+(\.[0-9]+)?)|(\??[a-zA-Z][a-zA-Z0-9_]*)|("[^"]*")))\s*,\s*(?P<op2>(([-]?[0-9]+(\.[0-9]+)?)|(\??[a-zA-Z][a-zA-Z0-9_]*)|("[^"]*")))\s*\)')
+    
+    @classmethod
+    def _get_new_node_name(cls):
+        return 'cmp(operator, op1, op2)'
     
     def can_connect_to(self, target, weight):
         super(ComparisonPlace, self).can_connect_to(target, weight)
@@ -608,38 +647,6 @@ class NandPlace(BaseFactPlace):
     def _get_unbound_vars(self):
         
         return self._incoming_arcs.values()[0]._get_unbound_vars()
-    
-class TaskStatusPlace(BaseFactPlace):
-    
-    FILL_COLOR = '#994400'
-    OUTLINE_COLOR = '#550000'
-    PREFIX = 'ts'
-    REGEX = re.compile(r'task_status\(((successful)|(failed)|(\?)|(\?[a-z-A-Z][a-z-A-Z0-9_-]*))\)')
-    
-    @classmethod
-    def _get_new_node_name(cls):
-        return 'task_status(?)'
-    
-    def _validate_name(self, val):
-        #Assert
-        if not self.REGEX.match(val):
-            raise Exception("A Task Status Place should have as parameter either one of the constants 'successful' and 'failed', or a variable.")
-    
-    def can_connect_to(self, target, weight):
-        super(TaskStatusPlace, self).can_connect_to(target, weight)
-        
-        if target.__class__ != RuleTransition:
-            raise Exception('TASK_STATUS places cannot connect to any transition other than a RULE Transition.')
-    
-    def _get_description(self):
-        
-        return ['task_status', self.name[self.name.find('(') + 1:-1]]
-    
-    def _get_bound_vars(self):
-        return set()
-    
-    def _get_unbound_vars(self):
-        return set()
 
 PLACE_CLASSES = (Place,
                  FactPlace,
