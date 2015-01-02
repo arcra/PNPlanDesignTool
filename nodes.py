@@ -903,8 +903,8 @@ class PreconditionsTransition(BaseRuleTransition):
         
     def can_connect_to(self, target, weight):
         super(PreconditionsTransition, self).can_connect_to(target, weight)
-        if target.__class__ is OrPlace:
-            raise Exception('PRECONDITIONS transitions cannot connect to an OR place.')
+        if target.__class__ in [OrPlace, NandPlace, FunctionPlace, ComparisonPlace]:
+            raise Exception('PRECONDITIONS transitions cannot connect to OR, NAND, Function or Comparison places.')
     
     def _get_preconditions(self):
         
@@ -999,8 +999,8 @@ class RuleTransition(PreconditionsTransition):
     
     def can_connect_to(self, target, weight):
         super(RuleTransition, self).can_connect_to(target, weight)
-        if target.__class__ == OrPlace:
-            raise Exception('RULE transitions cannot connect to OR places.')
+        if target.__class__ in [OrPlace, NandPlace, FunctionPlace, ComparisonPlace]:
+            raise Exception('RULE transitions cannot connect to OR, NAND, Function or Comparison places.')
     
     def _get_preconditions(self, is_cancelation = False):
         
@@ -1118,8 +1118,8 @@ class AndTransition(BaseRuleTransition):
     
     def can_connect_to(self, target, weight):
         super(AndTransition, self).can_connect_to(target, weight)
-        if target.__class__ != OrPlace:
-            raise Exception('AND transitions cannot connect to a place that is not an OR place.')
+        if target.__class__ not in [OrPlace, NandPlace]:
+            raise Exception('AND transitions cannot connect to a place that is not an OR place or a NAND place.')
     
     def _get_description(self, bound_vars):
         
