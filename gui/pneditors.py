@@ -3120,12 +3120,16 @@ class CancelationPNEditor(RulePNEditor):
                                                              ('Make Successful', self._make_successful),
                                                              ('Make Failed', self._make_failed)
                                                         ]
+        self._menus_options_sets_dict['task_status_place_connections'] = [
+                                                          ('Connect to...', self._connect_place_to, '(Double click)'),
+                                                          ('Connect to...(bidirectional)', self._connect_place_to_bidirectional, '(Shift+Double click)')
+                                                        ]
         self._menus_options_sets_dict['task_status_effect_operations'] = [
                                                                           ('Add Successful Place', self._add_successful),
                                                                           ('Add Failed Place', self._add_failed)
                                                                         ]
         self._menus_dict[RuleTransition.__name__] = ['preconditions_operations', 'fact_operations', 'command_operations', 'task_status_effect_operations', 'generic_transition_properties', 'generic_transition_connections']  # @UndefinedVariable
-        self._menus_dict[TaskStatusPlace.__name__] = ['task_status_operations']  # @UndefinedVariable
+        self._menus_dict[TaskStatusPlace.__name__] = ['task_status_operations', 'task_status_place_connections']  # @UndefinedVariable
     
     
     def _left_click_handlers(self, event):
