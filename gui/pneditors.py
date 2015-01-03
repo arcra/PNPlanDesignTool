@@ -1319,8 +1319,8 @@ class BasicPNEditor(Tkinter.Canvas):
         if not source_name or not target_name:
             raise Exception('No source and target specified!')
         
-        if 'place_' + source_name in tags:
-            arc = self._petri_net.places[source_name]._outgoing_arcs[target_name] 
+        if source_name in self._petri_net.places:
+            arc = self._petri_net.places[source_name]._outgoing_arcs[target_name]
         else:
             arc = self._petri_net.places[target_name]._incoming_arcs[source_name]
         

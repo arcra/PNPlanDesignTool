@@ -150,8 +150,6 @@ class Place(Node):
         if not self.petri_net or repr(self) not in self.petri_net.places or repr(target) not in self.petri_net.transitions:
             raise Exception('Arcs should go either from a place to a transition or vice versa and they should exist in the PN.')
         
-        if repr(target) in self._outgoing_arcs:
-            raise Exception('There already exists an arc between these nodes.')
     
     @classmethod
     def fromETreeElement(cls, element):
@@ -711,9 +709,6 @@ class Transition(Node):
         
         if weight < 1:
             raise Exception('Transitions cannot connect to places with inhibitor arcs (weight == 0).')
-        
-        if repr(target) in self._outgoing_arcs:
-            raise Exception('There already exists an arc between these nodes.')
     
     @classmethod
     def fromETreeElement(cls, element):

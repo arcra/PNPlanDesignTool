@@ -186,7 +186,7 @@ class BasicPetriNet(object):
         self._can_connect(source, target, weight)
         
         if repr(target) in source._outgoing_arcs:
-            return None
+            raise Exception('There already exists an arc between these nodes.')
         
         arc = _Arc(source, target, weight, _treeElement)
         
