@@ -1113,8 +1113,11 @@ class AndTransition(BaseRuleTransition):
     
     def can_connect_to(self, target, weight):
         super(AndTransition, self).can_connect_to(target, weight)
-        if target.__class__ not in [OrPlace, NandPlace]:
-            raise Exception('AND transitions cannot connect to a place that is not an OR place or a NAND place.')
+        
+        if target.__class__ not in [OrPlace, NandPlace, FactPlace,
+                                    StructuredFactPlace, PrimitiveTaskPlace,
+                                    NonPrimitiveTaskPlace, TaskStatusPlace]:
+            raise Exception('AND transitions can only connect to an OR place, a NAND place, or a precondition Fact, Task or TaskStatus places.')
     
     def _get_description(self, bound_vars):
         
