@@ -689,9 +689,11 @@ class PNPDT(object):
         dialog.window.transient(self.root)
         self.root.wait_window(dialog.window)
     
-    def export_task(self, zip_filename = None):
+    def export_task(self, zip_file_name = None):
         
-        if not zip_filename:
+        if zip_file_name:
+            zip_filename = zip_file_name
+        else:
             item_tags = self.project_tree.item(self.clicked_element, 'tags')
             
             extension = ''
@@ -750,6 +752,10 @@ class PNPDT(object):
                 
                 pne = self.petri_nets[current]
                 pne._petri_net.to_pnml_file(file_path)
+                
+                if zip_file_name:
+                    #This means this was called from the "save" routine.
+                    pne.edited = False
                 
                 zip_file.write(file_path, path_name)
                 os.remove(file_path)
