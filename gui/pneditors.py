@@ -14,7 +14,7 @@ from petrinets import BasicPetriNet, DecompositionPN, ExecutionPN,\
 from nodes import Place, Transition, TRANSITION_CLASSES, PLACE_CLASSES,\
     PreconditionsTransition, NonPrimitiveTaskPlace, SequenceTransition,\
     PrimitiveTaskPlace, FactPlace, StructuredFactPlace, OrPlace, AndTransition,\
-    RuleTransition, TaskStatusPlace, CommandPlace
+    RuleTransition, TaskStatusPlace, CommandPlace, NandPlace
 from settings import *
 from utils import Vec2
 from auxdialogs import PositiveIntDialog, NonNegativeFloatDialog, NonNegativeIntDialog
@@ -787,6 +787,9 @@ class BasicPNEditor(Tkinter.Canvas):
         
         p = self._petri_net.remove_place(p)
         
+        if not p:
+            raise Exception('Place was not removed!')
+        
         self.delete('place_' + repr(p))
         self.delete('source_' + repr(p))
         self.delete('target_' + repr(p))
@@ -803,6 +806,9 @@ class BasicPNEditor(Tkinter.Canvas):
         """
         
         t = self._petri_net.remove_transition(t)
+        
+        if not t:
+            raise Exception('Transition was not removed!')
         
         self.delete('transition_' + repr(t))
         self.delete('source_' + repr(t))
@@ -2443,7 +2449,8 @@ class RulePNEditor(RegularPNEditor):
         self._menus_dict[PrimitiveTaskPlace.__name__] = ['generic_place_properties', 'generic_place_operations', 'generic_place_connections']  # @UndefinedVariable
         self._menus_dict[FactPlace.__name__] = ['generic_place_properties', 'generic_place_operations', 'generic_place_connections']  # @UndefinedVariable
         self._menus_dict[StructuredFactPlace.__name__] = ['generic_place_properties', 'generic_place_operations', 'generic_place_connections']  # @UndefinedVariable
-        self._menus_dict[OrPlace.__name__] = ['or_operations', 'generic_place_operations']  # @UndefinedVariable
+        self._menus_dict[OrPlace.__name__] = ['or_operations', 'generic_place_operations', 'generic_place_connections']  # @UndefinedVariable
+        self._menus_dict[NandPlace.__name__] = ['generic_place_operations', 'generic_place_connections']  # @UndefinedVariable
         self._menus_dict[CommandPlace.__name__] = ['generic_place_properties', 'generic_place_operations']  # @UndefinedVariable
     
     def _left_click_handlers(self, event):
@@ -3025,7 +3032,7 @@ class RulePNEditor(RegularPNEditor):
             self.delete('selection')
             self.delete('connecting_arc')
             
-            p = OrPlace('NAND', self._last_point)
+            p = NandPlace('NAND', self._last_point)
             t = AndTransition('nand_t', p.position + Vec2(-80, 0))
             self.add_place(p)
             self.add_transition(t)
