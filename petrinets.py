@@ -123,6 +123,9 @@ class BasicPetriNet(object):
             el = self._tree.find('//*[@id="' + ref + '"]')
             el.getparent().remove(el)
         
+        el = self._tree.find('//place[@id="' + key + '"]')
+        el.getparent().remove(el)
+        
         p = self.places.pop(key)
         p._references.clear()
         p.petri_net = None
@@ -154,6 +157,9 @@ class BasicPetriNet(object):
         for ref in t._references:
             el = self._tree.find('//*[@id="' + ref + '"]')
             el.getparent().remove(el)
+        
+        el = self._tree.find('//transition[@id="' + key + '"]')
+        el.getparent().remove(el)
         
         t = self.transitions.pop(key)
         t._references.clear()
