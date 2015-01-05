@@ -59,7 +59,7 @@ class BasicPNEditor(Tkinter.Canvas):
         if not 'bg' in kwargs:
             kwargs['bg'] = 'white'
         
-        self._grid = kwargs.pop('grid', True)
+        self._grid = kwargs.pop('grid', False)
         self._label_transitions = kwargs.pop('label_transitions', False)
         
         self._create_petri_net(kwargs)
