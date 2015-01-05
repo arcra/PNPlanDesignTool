@@ -577,6 +577,7 @@ class RulePN(BasicPetriNet):
                                         'delete': self._handle_delete,
                                         'cmp': self._handle_cmp,
                                         'or' : self._handle_or,
+                                        'and' : self._handle_and,
                                         'not' : self._handle_not,
                                         'task_status' : lambda x: '(task_status ?pnpdt_task__ ' + x[1] + ')',
                                         'active_task' : lambda x: '(active_task ?pnpdt_task__)',
@@ -685,7 +686,7 @@ class RulePN(BasicPetriNet):
     def get_clips_code(self, is_cancelation = False):
         
         '''
-        (rule task_name-rule_name
+        (rule <task_name>-<rule_name>
             <preconditions>
             =>
             (retract <vars>)
@@ -693,7 +694,9 @@ class RulePN(BasicPetriNet):
                 <new_facts>
                 <task facts>
             )
-            (send-command "command" symbol "params" timeout attempts)
+            <commands>
+            (send-command "ex_command" symbol "params" timeout attempts)
+        )
         '''
         
         self._deleted_fact_count = 0
@@ -801,9 +804,17 @@ class RulePN(BasicPetriNet):
         return '(test ({0} {1} {2}))'.format(el[0], op1, op2)
     
     def _handle_or(self, lst):
-        el = lst[1]
         text = ['(or']
-        text += self._indent(self._preconditions_handlers[el[0]](el))
+        for el in lst[1]:
+            text += self._indent(self._preconditions_handlers[el[0]](el))
+        text += [')']
+        
+        return text
+    
+    def _handle_and(self, lst):
+        text = ['(and']
+        for el in lst[1]:
+            text += self._indent(self._preconditions_handlers[el[0]](el))
         text += [')']
         
         return text

@@ -636,15 +636,15 @@ class NandPlace(BaseFactPlace):
     def _get_description(self, bound_vars):
         
         #NAND places should only have one transition connected to them.
-        return self._incoming_arcs.values()[0]._get_description(bound_vars)
+        return self._incoming_arcs.values()[0].source._get_description(bound_vars)
     
     def _get_bound_vars(self):
         
-        return set(self._incoming_arcs.values()[0]._get_bound_vars())
+        return set(self._incoming_arcs.values()[0].source._get_bound_vars())
     
     def _get_unbound_vars(self):
         
-        return self._incoming_arcs.values()[0]._get_unbound_vars()
+        return self._incoming_arcs.values()[0].source._get_unbound_vars()
 
 PLACE_CLASSES = (Place,
                  FactPlace,
@@ -946,7 +946,7 @@ class PreconditionsTransition(BaseRuleTransition):
             elif arc.source.__class__ is NandPlace:
                 unbound_vars = (arc.source._get_unbound_vars() - self._bound_vars)
                 if not unbound_vars:
-                    preconditions.append(['not', arc.source._incoming_arcs.values()[0]._get_description(self._bound_vars)])
+                    preconditions.append(['not', arc.source._incoming_arcs.values()[0].source._get_description(self._bound_vars)])
                     edited = True
                     self._bound_vars |= arc.source._get_bound_vars()
             elif arc.source.__class__ is ComparisonPlace:
@@ -1053,15 +1053,15 @@ class RuleTransition(PreconditionsTransition):
                 unbound_vars = (arc.source._get_unbound_vars() - self._bound_vars)
                 if not unbound_vars:
                     if arc.weight > 0:
-                        preconditions.append(arc.source._get_description())
+                        preconditions.append(arc.source._get_description(self._bound_vars))
                     else:
-                        preconditions.append(['not', arc.source._get_description()])
+                        preconditions.append(['not', arc.source._get_description(self._bound_vars)])
                     edited = True
                     self._bound_vars |= arc.source._get_bound_vars()
             elif arc.source.__class__ is NandPlace:
                 unbound_vars = (arc.source._get_unbound_vars() - self._bound_vars)
                 if not unbound_vars:
-                    preconditions.append(['not', arc.source._incoming_arcs.values()[0]._get_description()])
+                    preconditions.append(['not', arc.source._get_description(self._bound_vars)])
                     edited = True
                     self._bound_vars |= arc.source._get_bound_vars()
             elif arc.source.__class__ is ComparisonPlace:
@@ -1121,7 +1121,7 @@ class AndTransition(BaseRuleTransition):
     
     def _get_description(self, bound_vars):
         
-        self._bound_vars = bound_vars[:]
+        self._bound_vars = copy.deepcopy(bound_vars)
         self._unbound_vars = set()
         
         incoming_arcs = self._incoming_arcs.values()
@@ -1157,7 +1157,7 @@ class AndTransition(BaseRuleTransition):
             elif arc.source.__class__ is NandPlace:
                 unbound_vars = (arc.source._get_unbound_vars() - self._bound_vars)
                 if not unbound_vars:
-                    preconditions.append(['not', arc.source._incoming_arcs.values()[0]._get_description(self._bound_vars)])
+                    preconditions.append(['not', arc.source._incoming_arcs.values()[0].source._get_description(self._bound_vars)])
                     edited = True
                     self._bound_vars |= arc.source._get_bound_vars()
             elif arc.source.__class__ is ComparisonPlace:
