@@ -755,7 +755,10 @@ class RulePN(BasicPetriNet):
                 arg = '=' + self._get_func_text(self._main_transition._func_dict[arg])
             text += ' ' + arg 
         
-        return '?pnpdt_task__ <-(task (plan ?pnpdt_planName__) (action_type {0}) (params{1}) (step ?pnpdt_step__ $?pnpdt_steps__) (parent ?pnpdt_parent__)'.format(lst[1], text)
+        if not text:
+            text = ' ""'
+        
+        return '(task (id ?pnpdt_task__) (plan ?pnpdt_planName__) (action_type {0}) (params{1}) (step ?pnpdt_step__ $?pnpdt_steps__) (parent ?pnpdt_parent__)'.format(lst[1], text)
     
     def _handle_fact(self, lst):
         text = ''
@@ -863,6 +866,9 @@ class RulePN(BasicPetriNet):
             if arg in self._main_transition._func_dict:
                 arg = self._get_func_text(self._main_transition._func_dict[arg])
             text += ' ' + arg 
+        
+        if not text:
+            text = ' ""'
         
         if lst[3] < 0:
             parent = '?pnpdt_parent__'
