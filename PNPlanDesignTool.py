@@ -684,7 +684,12 @@ class PNPDT(object):
             tkMessageBox.showerror('Invalid rule', str(e))
             return
         
-        dialog = InfoDialog('CLIPS code - ' + task_name + ' - ' + rule_name , clips_code)
+        task = task_name
+        pos = task_name.find('(')
+        if pos > -1:
+            task = task[:pos]
+        
+        dialog = InfoDialog('CLIPS code - ' + task + ' - ' + rule_name , clips_code)
         
         dialog.window.transient(self.root)
         self.root.wait_window(dialog.window)
