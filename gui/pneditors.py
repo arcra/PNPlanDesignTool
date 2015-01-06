@@ -12,7 +12,7 @@ from copy import deepcopy
 from petrinets import BasicPetriNet, DecompositionPN, ExecutionPN,\
     FinalizationPN, CancelationPN, RulePN
 from nodes import Place, Transition, TRANSITION_CLASSES, PLACE_CLASSES,\
-    PreconditionsTransition, NonPrimitiveTaskPlace, SequenceTransition,\
+    NonPrimitiveTaskPlace, SequenceTransition,\
     PrimitiveTaskPlace, FactPlace, StructuredFactPlace, OrPlace, AndTransition,\
     RuleTransition, TaskStatusPlace, CommandPlace, NandPlace
 from settings import *
@@ -3114,7 +3114,7 @@ class DecompositionPNEditor(RulePNEditor):
     def _configure_menus(self):
         RulePNEditor._configure_menus(self)
         
-        self._menus_dict[PreconditionsTransition.__name__] = ['preconditions_operations', 'fact_operations', 'task_operations', 'generic_transition_properties', 'generic_transition_connections']  # @UndefinedVariable
+        self._menus_dict[RuleTransition.__name__] = ['preconditions_operations', 'fact_operations', 'task_operations', 'generic_transition_properties', 'generic_transition_connections']  # @UndefinedVariable
     
 class CancelationPNEditor(RulePNEditor):
     

@@ -397,10 +397,10 @@ class PrimitiveTaskPlace(BaseFactPlace):
     
     def can_connect_to(self, target, weight):
         super(PrimitiveTaskPlace, self).can_connect_to(target, weight)
-        if target.__class__ not in [SequenceTransition, PreconditionsTransition, RuleTransition]:
+        if target.__class__ not in [SequenceTransition, RuleTransition]:
             raise Exception('TASK places cannot connect to a transition that is not of type SEQUENCE.')
         
-        if target.__class__ in [PreconditionsTransition, RuleTransition] and self.petri_net.task != self.name:
+        if target.__class__ is RuleTransition and self.petri_net.task != self.name:
             raise Exception('Only the TASK place corresponding to the task this rule belongs to is allowed to connect to a PRECONDITIONS or RULE Transition.')
         
         if weight == 0:
@@ -511,6 +511,9 @@ class FunctionPlace(BaseFactPlace):
     def can_connect_to(self, target, weight):
         super(FunctionPlace, self).can_connect_to(target, weight)
         
+        if weight == 0:
+            raise Exception('FUNCTION Places cannot connect with inhibitor arcs.')
+        
         if target.__class__ is SequenceTransition:
             raise Exception('FUNCTION Places cannot connect to SEQUENCE Transitions.')
     
@@ -594,7 +597,7 @@ class OrPlace(BaseFactPlace):
         params = []
         
         for arc in incoming_arcs:
-            if arc.weight == 1:
+            if arc.weight == 0:
                 params.append(['not', arc.source._get_description(bound_vars)])
             else:
                 params.append(arc.source._get_description(bound_vars))
@@ -605,17 +608,16 @@ class OrPlace(BaseFactPlace):
         
         incoming_arcs = self._incoming_arcs.values()
         
-        return set([arc.source._get_bound_vars() for arc in incoming_arcs])
+        arc = incoming_arcs.pop()
+        bound_vars = arc.source._get_bound_vars()
+        
+        for arc in incoming_arcs:
+            bound_vars &= arc.source._get_bound_vars()
+        
+        return bound_vars
     
     def _get_unbound_vars(self):
-        
-        incoming_arcs = self._incoming_arcs.values()
-        
-        unbound_vars = set()
-        for arc in incoming_arcs:
-            unbound_vars |= arc.source._get_unbound_vars()
-        
-        return unbound_vars
+        return set()
     
 class NandPlace(BaseFactPlace):
     
@@ -639,12 +641,10 @@ class NandPlace(BaseFactPlace):
         return self._incoming_arcs.values()[0].source._get_description(bound_vars)
     
     def _get_bound_vars(self):
-        
-        return set(self._incoming_arcs.values()[0].source._get_bound_vars())
+        return set()
     
     def _get_unbound_vars(self):
-        
-        return self._incoming_arcs.values()[0].source._get_unbound_vars()
+        return set()
 
 PLACE_CLASSES = (Place,
                  FactPlace,
@@ -890,105 +890,7 @@ class BaseRuleTransition(Transition):
         self._func_dict = {}
         super(BaseRuleTransition, self).__init__(*args, **kwargs)
 
-class PreconditionsTransition(BaseRuleTransition):
-    
-    FILL_COLOR = '#444444'
-    OUTLINE_COLOR = '#444444'
-    PREFIX = 'p'
-        
-    def can_connect_to(self, target, weight):
-        super(PreconditionsTransition, self).can_connect_to(target, weight)
-        if target.__class__ in [OrPlace, NandPlace, FunctionPlace, ComparisonPlace]:
-            raise Exception('PRECONDITIONS transitions cannot connect to OR, NAND, Function or Comparison places.')
-    
-    def _get_preconditions(self):
-        
-        self._bound_vars = set()
-        self._unbound_vars = set()
-        
-        incoming_arcs = self._incoming_arcs.values()
-        
-        preconditions = [['active_task'], ['not', ['task_status', '?']], ['not', ['cancel_active_tasks']]]
-        initial = None
-        edited = False
-        while incoming_arcs:
-            
-            arc = incoming_arcs.pop(0)
-            unbound_vars = None
-            
-            if arc.source.__class__ in [PrimitiveTaskPlace, NonPrimitiveTaskPlace]:
-                unbound_vars = (arc.source._get_unbound_vars() - self._bound_vars)
-                if not unbound_vars:
-                    preconditions.insert(0, arc.source._get_description())
-                    edited = True
-                    self._bound_vars |= arc.source._get_bound_vars()
-            elif arc.source.__class__ in [FactPlace, StructuredFactPlace]:
-                unbound_vars = (arc.source._get_unbound_vars() - self._bound_vars)
-                if not unbound_vars:
-                    if arc.weight > 0:
-                        if repr(arc.source) not in self._outgoing_arcs:
-                            preconditions.append(['delete', arc.source._get_description()])
-                        else:
-                            preconditions.append(arc.source._get_description())
-                    else:
-                        preconditions.append(['not', arc.source._get_description()])
-                    edited = True
-                    self._bound_vars |= arc.source._get_bound_vars()
-            elif arc.source.__class__ is OrPlace:
-                unbound_vars = (arc.source._get_unbound_vars() - self._bound_vars)
-                if not unbound_vars:
-                    if arc.weight > 0:
-                        preconditions.append(arc.source._get_description(self._bound_vars))
-                    else:
-                        preconditions.append(['not', arc.source._get_description(self._bound_vars)])
-                    edited = True
-                    self._bound_vars |= arc.source._get_bound_vars()
-            elif arc.source.__class__ is NandPlace:
-                unbound_vars = (arc.source._get_unbound_vars() - self._bound_vars)
-                if not unbound_vars:
-                    preconditions.append(['not', arc.source._incoming_arcs.values()[0].source._get_description(self._bound_vars)])
-                    edited = True
-                    self._bound_vars |= arc.source._get_bound_vars()
-            elif arc.source.__class__ is ComparisonPlace:
-                unbound_vars = (arc.source._get_unbound_vars() - self._bound_vars)
-                if not unbound_vars:
-                    preconditions.append(arc.source._get_description())
-                    edited = True
-                    self._bound_vars |= arc.source._get_bound_vars()
-            elif arc.source.__class__ is FunctionPlace:
-                unbound_vars = (arc.source._get_unbound_vars() - self._bound_vars)
-                if not unbound_vars:
-                    key, val = arc.source._get_func_substitution()
-                    self._func_dict[key] = val
-                    edited = True
-                    self._bound_vars |= arc.source._get_bound_vars()
-            else:
-                print 'Place was not parsed: ' + str(arc.source)
-                
-            #If arc was not processed/added:
-            if unbound_vars:
-                # Enqueue to process later
-                incoming_arcs.append(arc)
-                self._unbound_vars |= unbound_vars
-                
-                #Marc initial arc, if this arc is reached again and no other place was processed:
-                #then this place cannot be processed, i. e. it has unbound variables.
-                if initial not in incoming_arcs:
-                    initial = arc
-                elif initial is arc:
-                    if edited:
-                        edited = False
-                    else:
-                        break
-        
-        if incoming_arcs:
-            self._unbound_vars -= self._bound_vars
-            raise Exception('The following unbound variables were found: ' + ', '.join(self._unbound_vars) + '.')
-        
-        
-        return preconditions
-
-class RuleTransition(PreconditionsTransition):
+class RuleTransition(BaseRuleTransition):
     
     PREFIX = 'r'
     
@@ -1003,6 +905,7 @@ class RuleTransition(PreconditionsTransition):
         self._unbound_vars = set()
         
         incoming_arcs = self._incoming_arcs.values()
+        not_arcs = []
         
         cancelation_precondition = ['not', ['cancel_active_tasks']]
         if is_cancelation:
@@ -1018,6 +921,11 @@ class RuleTransition(PreconditionsTransition):
         while incoming_arcs:
             
             arc = incoming_arcs.pop(0)
+            
+            if arc.weight == 0:
+                not_arcs.append(arc)
+                continue
+            
             unbound_vars = None
             
             if arc.source.__class__ in [PrimitiveTaskPlace, NonPrimitiveTaskPlace]:
@@ -1033,35 +941,22 @@ class RuleTransition(PreconditionsTransition):
                         first_arcs.append(['delete', arc.source._get_description()])
                     else:
                         first_arcs.append(arc.source._get_description())
-                    
                     edited = True
                     task_status = True
                     self._bound_vars |= arc.source._get_bound_vars()
             elif arc.source.__class__ in [FactPlace, StructuredFactPlace]:
                 unbound_vars = (arc.source._get_unbound_vars() - self._bound_vars)
                 if not unbound_vars:
-                    if arc.weight > 0:
-                        if repr(arc.source) not in self._outgoing_arcs:
-                            preconditions.append(['delete', arc.source._get_description()])
-                        else:
-                            preconditions.append(arc.source._get_description())
+                    if repr(arc.source) not in self._outgoing_arcs:
+                        preconditions.append(['delete', arc.source._get_description()])
                     else:
-                        preconditions.append(['not', arc.source._get_description()])
+                        preconditions.append(arc.source._get_description())
                     edited = True
                     self._bound_vars |= arc.source._get_bound_vars()
             elif arc.source.__class__ is OrPlace:
                 unbound_vars = (arc.source._get_unbound_vars() - self._bound_vars)
                 if not unbound_vars:
-                    if arc.weight > 0:
-                        preconditions.append(arc.source._get_description(self._bound_vars))
-                    else:
-                        preconditions.append(['not', arc.source._get_description(self._bound_vars)])
-                    edited = True
-                    self._bound_vars |= arc.source._get_bound_vars()
-            elif arc.source.__class__ is NandPlace:
-                unbound_vars = (arc.source._get_unbound_vars() - self._bound_vars)
-                if not unbound_vars:
-                    preconditions.append(['not', arc.source._get_description(self._bound_vars)])
+                    preconditions.append(arc.source._get_description(self._bound_vars))
                     edited = True
                     self._bound_vars |= arc.source._get_bound_vars()
             elif arc.source.__class__ is ComparisonPlace:
@@ -1094,14 +989,21 @@ class RuleTransition(PreconditionsTransition):
                     if edited:
                         edited = False
                     else:
-                        break
-        
-        if incoming_arcs:
-            self._unbound_vars -= self._bound_vars
-            raise Exception('The following unbound variables were found: ' + ', '.join(self._unbound_vars) + '.')
+                        self._unbound_vars -= self._bound_vars
+                        raise Exception('The following unbound variables were found: ' + ', '.join(self._unbound_vars) + '.')
         
         if not task_status:
             first_arcs.append(['not', ['task_status', '?']])
+        
+        while not_arcs:
+            arc = not_arcs.pop(0)
+            
+            if arc.source.__class__ in [FactPlace, StructuredFactPlace, ComparisonPlace]:
+                preconditions.append(['not', arc.source._get_description()])
+            elif arc.source.__class__ in [OrPlace, NandPlace]:
+                preconditions.append(['not', arc.source._get_description(self._bound_vars)])
+            else:
+                print 'Place was not parsed: ' + str(arc.source)
         
         return first_arcs + preconditions
     
@@ -1121,10 +1023,11 @@ class AndTransition(BaseRuleTransition):
     
     def _get_description(self, bound_vars):
         
-        self._bound_vars = copy.deepcopy(bound_vars)
+        self._bound_vars = set(bound_vars)
         self._unbound_vars = set()
         
         incoming_arcs = self._incoming_arcs.values()
+        not_arcs = []
         
         preconditions = []
         
@@ -1134,30 +1037,23 @@ class AndTransition(BaseRuleTransition):
         while incoming_arcs:
             
             arc = incoming_arcs.pop(0)
+            
+            if arc.weight == 0:
+                not_arcs.append(arc)
+                continue
+            
             unbound_vars = None
             
             if arc.source.__class__ in [FactPlace, StructuredFactPlace]:
                 unbound_vars = (arc.source._get_unbound_vars() - self._bound_vars)
                 if not unbound_vars:
-                    if arc.weight > 0:
-                        preconditions.append(arc.source._get_description())
-                    else:
-                        preconditions.append(['not', arc.source._get_description()])
+                    preconditions.append(arc.source._get_description())
                     edited = True
                     self._bound_vars |= arc.source._get_bound_vars()
             elif arc.source.__class__ is OrPlace:
                 unbound_vars = (arc.source._get_unbound_vars() - self._bound_vars)
                 if not unbound_vars:
-                    if arc.weight > 0:
-                        preconditions.append(arc.source._get_description(self._bound_vars))
-                    else:
-                        preconditions.append(['not', arc.source._get_description(self._bound_vars)])
-                    edited = True
-                    self._bound_vars |= arc.source._get_bound_vars()
-            elif arc.source.__class__ is NandPlace:
-                unbound_vars = (arc.source._get_unbound_vars() - self._bound_vars)
-                if not unbound_vars:
-                    preconditions.append(['not', arc.source._incoming_arcs.values()[0].source._get_description(self._bound_vars)])
+                    preconditions.append(arc.source._get_description(self._bound_vars))
                     edited = True
                     self._bound_vars |= arc.source._get_bound_vars()
             elif arc.source.__class__ is ComparisonPlace:
@@ -1190,10 +1086,19 @@ class AndTransition(BaseRuleTransition):
                     if edited:
                         edited = False
                     else:
-                        break
+                        raise Exception('Something wrong happened. Unbound variables found while getting AND preconditions.')
         
-        if incoming_arcs:
-            raise Exception('Something wrong happened. Unbound variables found while getting AND preconditions.')
+        for arc in not_arcs:
+            
+            if arc.source.__class__ in [FactPlace, StructuredFactPlace, ComparisonPlace]:
+                preconditions.append(['not', arc.source._get_description()])
+            elif arc.source.__class__ in [OrPlace, NandPlace]:
+                preconditions.append(['not', arc.source._get_description(self._bound_vars)])
+            else:
+                print 'Place was not parsed: ' + str(arc.source)
+        
+        if len(preconditions) == 1:
+            return preconditions[0]
         
         return ['and', preconditions]
     
@@ -1204,120 +1109,35 @@ class AndTransition(BaseRuleTransition):
         
         incoming_arcs = self._incoming_arcs.values()
         
-        initial = None
-        edited = False
-        
-        while incoming_arcs:
+        for arc in incoming_arcs:
             
-            arc = incoming_arcs.pop(0)
-            unbound_vars = None
+            if arc.weight == 0:
+                continue
             
-            if arc.source.__class__ in [FactPlace, StructuredFactPlace]:
-                unbound_vars = (arc.source._get_unbound_vars() - self._bound_vars)
-                if not unbound_vars:
-                    edited = True
-                    self._bound_vars |= arc.source._get_bound_vars()
-            elif arc.source.__class__ is OrPlace:
-                unbound_vars = (arc.source._get_unbound_vars() - self._bound_vars)
-                if not unbound_vars:
-                    edited = True
-                    self._bound_vars |= arc.source._get_bound_vars()
-            elif arc.source.__class__ is NandPlace:
-                unbound_vars = (arc.source._get_unbound_vars() - self._bound_vars)
-                if not unbound_vars:
-                    edited = True
-                    self._bound_vars |= arc.source._get_bound_vars()
-            elif arc.source.__class__ is ComparisonPlace:
-                unbound_vars = (arc.source._get_unbound_vars() - self._bound_vars)
-                if not unbound_vars:
-                    edited = True
-                    self._bound_vars |= arc.source._get_bound_vars()
-            elif arc.source.__class__ is FunctionPlace:
-                unbound_vars = (arc.source._get_unbound_vars() - self._bound_vars)
-                if not unbound_vars:
-                    edited = True
-                    self._bound_vars |= arc.source._get_bound_vars()
-            else:
-                print 'Place was not parsed: ' + str(arc.source)
-                
-            #If arc was not processed/added:
-            if unbound_vars:
-                # Enqueue to process later
-                incoming_arcs.append(arc)
-                self._unbound_vars |= unbound_vars
-                
-                #Marc initial arc, if this arc is reached again and no other place was processed:
-                #then this place cannot be processed, i. e. it has unbound variables.
-                if initial not in incoming_arcs:
-                    initial = arc
-                elif initial is arc:
-                    if edited:
-                        edited = False
-                    else:
-                        break
+            if arc.source.__class__ in [FactPlace, StructuredFactPlace,
+                                        ComparisonPlace, FunctionPlace,
+                                        OrPlace]:
+                self._bound_vars |= arc.source._get_bound_vars()
         
         return self._bound_vars
     
     def _get_unbound_vars(self):
         
-        self._bound_vars = set()
+        self._bound_vars = self._get_bound_vars()
         self._unbound_vars = set()
         
         incoming_arcs = self._incoming_arcs.values()
         
-        initial = None
-        edited = False
-        
-        while incoming_arcs:
+        for arc in incoming_arcs:
             
-            arc = incoming_arcs.pop(0)
-            unbound_vars = None
+            if arc.weight == 0:
+                continue
             
-            if arc.source.__class__ in [FactPlace, StructuredFactPlace]:
-                unbound_vars = (arc.source._get_unbound_vars() - self._bound_vars)
-                if not unbound_vars:
-                    edited = True
-                    self._bound_vars |= arc.source._get_bound_vars()
-            elif arc.source.__class__ is OrPlace:
-                unbound_vars = (arc.source._get_unbound_vars() - self._bound_vars)
-                if not unbound_vars:
-                    edited = True
-                    self._bound_vars |= arc.source._get_bound_vars()
-            elif arc.source.__class__ is NandPlace:
-                unbound_vars = (arc.source._get_unbound_vars() - self._bound_vars)
-                if not unbound_vars:
-                    edited = True
-                    self._bound_vars |= arc.source._get_bound_vars()
-            elif arc.source.__class__ is ComparisonPlace:
-                unbound_vars = (arc.source._get_unbound_vars() - self._bound_vars)
-                if not unbound_vars:
-                    edited = True
-                    self._bound_vars |= arc.source._get_bound_vars()
+            if arc.source.__class__ is ComparisonPlace:
+                self._unbound_vars |= (arc.source._get_unbound_vars() - self._bound_vars)
             elif arc.source.__class__ is FunctionPlace:
-                unbound_vars = (arc.source._get_unbound_vars() - self._bound_vars)
-                if not unbound_vars:
-                    edited = True
-                    self._bound_vars |= arc.source._get_bound_vars()
-            else:
-                print 'Place was not parsed: ' + str(arc.source)
-                
-            #If arc was not processed/added:
-            if unbound_vars:
-                # Enqueue to process later
-                incoming_arcs.append(arc)
-                self._unbound_vars |= unbound_vars
-                
-                #Marc initial arc, if this arc is reached again and no other place was processed:
-                #then this place cannot be processed, i. e. it has unbound variables.
-                if initial not in incoming_arcs:
-                    initial = arc
-                elif initial is arc:
-                    if edited:
-                        edited = False
-                    else:
-                        break
+                self._unbound_vars |= (arc.source._get_unbound_vars() - self._bound_vars)
         
-        self._unbound_vars -= self._bound_vars
         return self._unbound_vars
 
 class SequenceTransition(BaseRuleTransition):
@@ -1332,7 +1152,6 @@ class SequenceTransition(BaseRuleTransition):
             raise Exception('SEQUENCE transitions cannot connect to places that are not TASK places.')
 
 TRANSITION_CLASSES = (Transition,
-                 PreconditionsTransition,
                  RuleTransition,
                  AndTransition,
                  SequenceTransition)

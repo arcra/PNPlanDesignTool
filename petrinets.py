@@ -9,7 +9,7 @@ import os
 #import xml.etree.ElementTree as ET
 import lxml.etree as ET
 
-from nodes import Place, Transition, PreconditionsTransition, _Arc, _get_treeElement,\
+from nodes import Place, Transition, _Arc, _get_treeElement,\
     RuleTransition, SequenceTransition, TaskStatusPlace, NonPrimitiveTaskPlace,\
     PrimitiveTaskPlace, FactPlace, StructuredFactPlace, CommandPlace
 from utils import Vec2
@@ -247,9 +247,6 @@ class BasicPetriNet(object):
             if task:
                 t = None
                 for current_t in net.findall('page//transition'):
-                    if current_t.find('name/text').text.startswith(PreconditionsTransition.PREFIX + '.'):
-                        t = current_t
-                        break
                     if current_t.find('name/text').text.startswith(RuleTransition.PREFIX + '.'):
                         t = current_t
                         break
@@ -636,7 +633,7 @@ class RulePN(BasicPetriNet):
             return self._main_transition_
         
         for t in self.transitions.itervalues():
-            if t.__class__ is PreconditionsTransition or t.__class__ is RuleTransition:
+            if t.__class__ is RuleTransition:
                 self._main_transition_ = t
                 return self._main_transition_
         
@@ -821,6 +818,11 @@ class RulePN(BasicPetriNet):
     
     def _handle_not(self, lst):
         el = lst[1]
+        
+        if el[0] == 'not':
+            el = el[1]
+            return self._preconditions_handlers[el[0]](el)
+        
         text = ['(not']
         text += self._indent(self._preconditions_handlers[el[0]](el))
         text += [')']
@@ -902,11 +904,11 @@ class RulePN(BasicPetriNet):
             if repr(arc.target) in self._main_transition._incoming_arcs:
                 continue
             
-            unbound_vars |= (arc.target._get_vars() - self._main_transition._bound_vars)
+            unbound_vars |= (arc.target._get_unbound_vars() - self._main_transition._bound_vars)
             
             if arc.target.__class__ in [PrimitiveTaskPlace, NonPrimitiveTaskPlace]:
                 tasks += self._get_task_effects(arc)
-            elif arc.target.__class__ in [FactPlace, StructuredFactPlace]:
+            elif arc.target.__class__ in [FactPlace, StructuredFactPlace, TaskStatusPlace]:
                 facts.append(arc.target._get_description())
             elif arc.target.__class__ is CommandPlace:
                 commands.append(arc.target._get_description())
@@ -942,32 +944,8 @@ class RulePN(BasicPetriNet):
 
 class DecompositionPN(RulePN):
     
-    def __init__(self, name, task, is_primitive_task = None, _net = None):
-        super(DecompositionPN, self).__init__(name, task, is_primitive_task, _net)
-    
-    def _initialize(self):
-        self._main_transition = PreconditionsTransition('Preconditions', Vec2(350, 300))
-        self.add_transition(self._main_transition)
-    
-    '''
-    @BasicPetriNet.task.setter
-    def task(self, val):
-        
-        BasicPetriNet.task.setter(val)
-        
-        for p in self.places.itervalues():
-            if p.name == self.task:
-                break
-        
-        if not p:
-            raise Exception('Parent Task Place was not found.')
-        
-        p.name = val
-    '''
-    
     @classmethod
     def from_pnml_file(cls, filename, task):
-        
         return BasicPetriNet.from_pnml_file(filename, PetriNetClass = cls, task = task)
 
 class ExecutionPN(RulePN):
