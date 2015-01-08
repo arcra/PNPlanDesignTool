@@ -14,7 +14,8 @@ from petrinets import BasicPetriNet, DecompositionPN, ExecutionPN,\
 from nodes import Place, Transition, TRANSITION_CLASSES, PLACE_CLASSES,\
     NonPrimitiveTaskPlace, SequenceTransition,\
     PrimitiveTaskPlace, FactPlace, StructuredFactPlace, OrPlace, AndTransition,\
-    RuleTransition, TaskStatusPlace, CommandPlace, NandPlace
+    RuleTransition, TaskStatusPlace, CommandPlace, NandPlace, FunctionPlace,\
+    ComparisonPlace
 from settings import *
 from utils import Vec2
 from auxdialogs import PositiveIntDialog, NonNegativeFloatDialog, NonNegativeIntDialog
@@ -2424,7 +2425,9 @@ class RulePNEditor(RegularPNEditor):
                                                              ('Add NEGATED Structured Fact Precondition', self._add_negated_structured_fact),
                                                              ('Add NAND Precondition', self._add_nand),
                                                              ('Add OR Precondition', self._add_or),
-                                                             ('Add NOR Precondition', self._add_nor)
+                                                             ('Add NOR Precondition', self._add_nor),
+                                                             ('Add Function', self._add_func),
+                                                             ('Add Comparison', self._add_cmp)
                                                             ]
         self._menus_options_sets_dict['fact_operations'] = [
                                                              ('Add Fact', self._add_fact),
@@ -2452,6 +2455,8 @@ class RulePNEditor(RegularPNEditor):
         self._menus_dict[OrPlace.__name__] = ['or_operations', 'generic_place_operations', 'generic_place_connections']  # @UndefinedVariable
         self._menus_dict[NandPlace.__name__] = ['generic_place_operations', 'generic_place_connections']  # @UndefinedVariable
         self._menus_dict[CommandPlace.__name__] = ['generic_place_properties', 'generic_place_operations']  # @UndefinedVariable
+        self._menus_dict[FunctionPlace.__name__] = ['generic_place_properties', 'generic_place_operations']  # @UndefinedVariable
+        self._menus_dict[ComparisonPlace.__name__] = ['generic_place_properties', 'generic_place_operations']  # @UndefinedVariable
     
     def _left_click_handlers(self, event):
         
@@ -2496,6 +2501,14 @@ class RulePNEditor(RegularPNEditor):
         
         if self._state == 'adding_command':
             self._finish_adding_command(event)
+            return True
+        
+        if self._state == 'adding_func':
+            self._finish_adding_func(event)
+            return True
+        
+        if self._state == 'adding_cmp':
+            self._finish_adding_cmp(event)
             return True
     
     def _escape_handlers(self, event):
@@ -2592,6 +2605,42 @@ class RulePNEditor(RegularPNEditor):
         
         self._connecting_t = self._petri_net.transitions[transition_id]
         self._place_class = PlaceClass
+        
+        self._adding_node_fn_id = self.bind('<Motion>', self._dragCallback, '+')
+        self._connecting_node_fn_id = self.bind('<Motion>', self._connecting_place_to_transition, '+')
+    
+    def _add_func(self):
+        self._state = 'adding_func'
+        self.grab_set()
+        self._anchor_set = True
+        self._anchor_tag = 'selection'
+        
+        #Create drawing of place
+        p_position = self._last_point
+        fact_id = self._draw_place_item(p_position, FunctionPlace)
+        self.addtag_withtag('selection', fact_id)
+        
+        transition_id = self._get_transition_id(self._last_clicked_id)
+        
+        self._connecting_t = self._petri_net.transitions[transition_id]
+        
+        self._adding_node_fn_id = self.bind('<Motion>', self._dragCallback, '+')
+        self._connecting_node_fn_id = self.bind('<Motion>', self._connecting_place_to_transition, '+')
+    
+    def _add_cmp(self):
+        self._state = 'adding_cmp'
+        self.grab_set()
+        self._anchor_set = True
+        self._anchor_tag = 'selection'
+        
+        #Create drawing of place
+        p_position = self._last_point
+        fact_id = self._draw_place_item(p_position, ComparisonPlace)
+        self.addtag_withtag('selection', fact_id)
+        
+        transition_id = self._get_transition_id(self._last_clicked_id)
+        
+        self._connecting_t = self._petri_net.transitions[transition_id]
         
         self._adding_node_fn_id = self.bind('<Motion>', self._dragCallback, '+')
         self._connecting_node_fn_id = self.bind('<Motion>', self._connecting_place_to_transition, '+')
@@ -2976,6 +3025,24 @@ class RulePNEditor(RegularPNEditor):
             self.unbind('<Motion>', self._connecting_node_fn_id)
             self.unbind('<Motion>', self._adding_node_fn_id)
     
+    def _finish_adding_func(self, event):
+        try:
+            self._create_place(FunctionPlace, afterFunction = self._add_simple_precondition_arc, afterCancelFunction = self._cancel_create_place)
+        except Exception as e:
+            tkMessageBox.showerror('Creation Error', str(e))
+        finally:
+            self.unbind('<Motion>', self._connecting_node_fn_id)
+            self.unbind('<Motion>', self._adding_node_fn_id)
+    
+    def _finish_adding_cmp(self, event):
+        try:
+            self._create_place(ComparisonPlace, afterFunction = self._add_simple_precondition_arc, afterCancelFunction = self._cancel_create_place)
+        except Exception as e:
+            tkMessageBox.showerror('Creation Error', str(e))
+        finally:
+            self.unbind('<Motion>', self._connecting_node_fn_id)
+            self.unbind('<Motion>', self._adding_node_fn_id)
+    
     def _finish_adding_fact(self, event):
         try:
             self._create_place(self._place_class, afterFunction = self._add_simple_place_arc, afterCancelFunction = self._cancel_create_place)
@@ -3091,6 +3158,11 @@ class RulePNEditor(RegularPNEditor):
         self.delete('selection')
         self.delete('connecting_arc')
         self.add_arc(p, self._connecting_t, 0)
+    
+    def _add_simple_precondition_arc(self, p):
+        self.delete('selection')
+        self.delete('connecting_arc')
+        self.add_arc(p, self._connecting_t)
     
     def _add_simple_place_arc(self, p):
         self.delete('selection')
