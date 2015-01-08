@@ -93,17 +93,29 @@ class InfoDialog(object):
         
         self.window.bind('<KeyPress-Return>', self.ok_callback)
         
-        self.text = tk.Label(self.window, text = text, justify = tk.LEFT)
-        self.text.grid(row = 0, column = 0, columnspan = 3, sticky = tk.NW)
+        self.text = text
+        
+        self.label = tk.Label(self.window, text = text, justify = tk.LEFT)
+        #self.label = tk.Text(self.window, height = 30, width = 150, bg = self.window.cget('bg'), relief = tk.FLAT)
+        #self.label.insert(1.0, text)
+        #self.label.configure(state = "disabled")
+        self.label.grid(row = 0, column = 0, columnspan = 3, sticky = tk.NW)
+        
+        self.copy_button = tk.Button(self.window, text = 'Copy to clipboard', command = self.copy_callback)
+        self.copy_button.grid(row = 1, column = 0)
         
         self.ok_button = tk.Button(self.window, text = 'Ok', command = self.ok_callback)
-        self.ok_button.grid(row = 1, column = 2)
+        self.ok_button.grid(row = 1, column = 1)
         
         self.window.grab_set()
         self.window.focus_set()
     
     def ok_callback(self, event = None):
         self.window.destroy()
+    
+    def copy_callback(self, event = None):
+        self.window.clipboard_clear()
+        self.window.clipboard_append(self.text)
 
 class _SelectTreeElementDialog(object):
     
