@@ -1160,7 +1160,7 @@ class BasicPNEditor(Tkinter.Canvas):
         #extra padding because entry position refers to the center, not the corner
         label_padding = PLACE_LABEL_PADDING + 10
         
-        txtbox_id = self.create_window(p.position.x, p.position.y + label_padding*self._current_scale, height= 20, width = 85, window = txtbox)
+        txtbox_id = self.create_window(p.position.x, p.position.y + label_padding*self._current_scale, height= 20, width = 180, window = txtbox)
         txtbox.wait_visibility()
         txtbox.grab_set()
         txtbox.focus_set()
@@ -1483,7 +1483,7 @@ class BasicPNEditor(Tkinter.Canvas):
         #extra padding because entry position refers to the center, not the corner
         label_padding = PLACE_LABEL_PADDING + 10
         
-        txtbox_id = self.create_window(p.position.x, p.position.y + label_padding*self._current_scale, height= 20, width = 85, window = txtbox)
+        txtbox_id = self.create_window(p.position.x, p.position.y + label_padding*self._current_scale, height= 20, width = 180, window = txtbox)
         txtbox.wait_visibility()
         txtbox.grab_set()
         txtbox.focus_set()
@@ -2427,7 +2427,9 @@ class RulePNEditor(RegularPNEditor):
                                                              ('Add OR Precondition', self._add_or),
                                                              ('Add NOR Precondition', self._add_nor),
                                                              ('Add Function', self._add_func),
-                                                             ('Add Comparison', self._add_cmp)
+                                                             ('Add Comparison', self._add_cmp),
+                                                             ('Add Response precondition', self._add_response),
+                                                             ('Add NEGATED Response precondition', self._add_negated_response)
                                                             ]
         self._menus_options_sets_dict['fact_operations'] = [
                                                              ('Add Fact', self._add_fact),
@@ -2477,6 +2479,14 @@ class RulePNEditor(RegularPNEditor):
         
         if self._state == 'adding_negated_fact':
             self._finish_adding_negated_fact(event)
+            return True
+        
+        if self._state == 'adding_response':
+            self._finish_adding_response(event)
+            return True
+        
+        if self._state == 'adding_negated_response':
+            self._finish_adding_negated_response(event)
             return True
         
         if self._state == 'adding_fact':
@@ -2609,6 +2619,24 @@ class RulePNEditor(RegularPNEditor):
         self._adding_node_fn_id = self.bind('<Motion>', self._dragCallback, '+')
         self._connecting_node_fn_id = self.bind('<Motion>', self._connecting_place_to_transition, '+')
     
+    def _add_response(self):
+        self._state = 'adding_response'
+        self.grab_set()
+        self._anchor_set = True
+        self._anchor_tag = 'selection'
+        
+        #Create drawing of place
+        p_position = self._last_point
+        fact_id = self._draw_place_item(p_position, FactPlace)
+        self.addtag_withtag('selection', fact_id)
+        
+        transition_id = self._get_transition_id(self._last_clicked_id)
+        
+        self._connecting_t = self._petri_net.transitions[transition_id]
+        
+        self._adding_node_fn_id = self.bind('<Motion>', self._dragCallback, '+')
+        self._connecting_node_fn_id = self.bind('<Motion>', self._connecting_place_to_transition, '+')
+    
     def _add_func(self):
         self._state = 'adding_func'
         self.grab_set()
@@ -2694,6 +2722,24 @@ class RulePNEditor(RegularPNEditor):
         
         self._adding_node_fn_id = self.bind('<Motion>', self._dragCallback, '+')
         self._connecting_node_fn_id = self.bind('<Motion>', self._connecting_negated_place_to_transition, '+')
+    
+    def _add_negated_response(self):
+        self._state = 'adding_negated_response'
+        self.grab_set()
+        self._anchor_set = True
+        self._anchor_tag = 'selection'
+        
+        #Create drawing of place
+        p_position = self._last_point
+        fact_id = self._draw_place_item(p_position, FactPlace)
+        self.addtag_withtag('selection', fact_id)
+        
+        transition_id = self._get_transition_id(self._last_clicked_id)
+        
+        self._connecting_t = self._petri_net.transitions[transition_id]
+        
+        self._adding_node_fn_id = self.bind('<Motion>', self._dragCallback, '+')
+        self._connecting_node_fn_id = self.bind('<Motion>', self._connecting_place_to_transition, '+')
     
     def _add_or(self):
         self._state = 'adding_or'
@@ -3016,9 +3062,35 @@ class RulePNEditor(RegularPNEditor):
             self.unbind('<Motion>', self._connecting_node_fn_id)
             self.unbind('<Motion>', self._adding_node_fn_id)
     
+    def _finish_adding_response(self, event):
+        try:
+            self._create_place(FactPlace,
+                               afterFunction = self._add_fact_precondition_arc,
+                               afterCancelFunction = self._cancel_create_place,
+                               initial_name = 'BB_answer("command", ?symbol, result, ?params)'
+                               )
+        except Exception as e:
+            tkMessageBox.showerror('Creation Error', str(e))
+        finally:
+            self.unbind('<Motion>', self._connecting_node_fn_id)
+            self.unbind('<Motion>', self._adding_node_fn_id)
+    
     def _finish_adding_negated_fact(self, event):
         try:
             self._create_place(self._place_class, afterFunction = self._add_negated_fact_arc, afterCancelFunction = self._cancel_create_place)
+        except Exception as e:
+            tkMessageBox.showerror('Creation Error', str(e))
+        finally:
+            self.unbind('<Motion>', self._connecting_node_fn_id)
+            self.unbind('<Motion>', self._adding_node_fn_id)
+    
+    def _finish_adding_negated_response(self, event):
+        try:
+            self._create_place(FactPlace,
+                               afterFunction = self._add_negated_fact_arc,
+                               afterCancelFunction = self._cancel_create_place,
+                               initial_name = 'BB_answer("command", ?symbol, result, ?params)'
+                               )
         except Exception as e:
             tkMessageBox.showerror('Creation Error', str(e))
         finally:
