@@ -93,6 +93,28 @@ class InfoDialog(object):
         
         self.window.bind('<KeyPress-Return>', self.ok_callback)
         
+        self.label = tk.Label(self.window, text = text, justify = tk.LEFT)
+        self.label.grid(row = 0, column = 0, columnspan = 3, sticky = tk.NW)
+        
+        self.ok_button = tk.Button(self.window, text = 'Ok', command = self.ok_callback)
+        self.ok_button.grid(row = 1, column = 1)
+        
+        self.window.grab_set()
+        self.window.focus_set()
+    
+    def ok_callback(self, event = None):
+        self.window.destroy()
+
+class CopyTextDialog(object):
+    
+    def __init__(self, title, text):
+        super(CopyTextDialog, self).__init__()
+        
+        self.window = tk.Toplevel()
+        self.window.title(title)
+        
+        self.window.bind('<KeyPress-Return>', self.ok_callback)
+        
         self.text = text
         
         self.label = tk.Label(self.window, text = text, justify = tk.LEFT)

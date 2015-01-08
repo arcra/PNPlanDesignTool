@@ -17,7 +17,7 @@ import tempfile
 from gui.tabmanager import TabManager
 from gui.pneditors import DecompositionPNEditor,\
     ExecutionPNEditor, FinalizationPNEditor, CancelationPNEditor, RulePNEditor
-from gui.auxdialogs import InputDialog, InfoDialog
+from gui.auxdialogs import InputDialog, CopyTextDialog
 from nodes import FactPlace
 
 class PNPDT(object):
@@ -689,7 +689,7 @@ class PNPDT(object):
         if pos > -1:
             task = task[:pos]
         
-        dialog = InfoDialog('CLIPS code - ' + task + ' - ' + rule_name , clips_code)
+        dialog = CopyTextDialog('CLIPS code - ' + task + ' - ' + rule_name , clips_code)
         
         dialog.window.transient(self.root)
         self.root.wait_window(dialog.window)
