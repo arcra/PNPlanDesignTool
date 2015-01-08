@@ -882,12 +882,18 @@ class RulePN(BasicPetriNet):
     def _handle_command(self, lst):
         text = ''
         
-        for arg in lst[2]:
+        symbol = lst[2][0]
+        params = lst[2][1:]
+        
+        for arg in params:
             if arg in self._main_transition._func_dict:
                 arg = self._get_func_text(self._main_transition._func_dict[arg])
-            text += ' ' + arg 
+            text += ' ' + arg
         
-        return '(send-command "{0}" {1})'.format(lst[1], text)
+        if not text:
+            text = ""
+        
+        return '(send-command "{0}" {1} {2})'.format(lst[1], symbol, text)
     
     def _handle_task_status_effect(self, lst):
         
