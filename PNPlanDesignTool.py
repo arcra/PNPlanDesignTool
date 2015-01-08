@@ -135,7 +135,9 @@ class PNPDT(object):
         self.petri_net_menu = tk.Menu(self.root, tearoff = 0)
         self.petri_net_menu.add_command(label = 'Open', command = self.open_petri_net)
         self.petri_net_menu.add_command(label = 'Rename', command = self.rename_petri_net)
+        self.petri_net_menu.add_separator()
         self.petri_net_menu.add_command(label = 'Delete', command = self.delete_petri_net)
+        self.petri_net_menu.add_separator()
         self.petri_net_menu.add_command(label = 'View CLIPS code', command = self.view_clips_code)
         self.petri_net_menu.add_command(label = 'Export Rule to PNML', command = self.export_to_PNML)
         
