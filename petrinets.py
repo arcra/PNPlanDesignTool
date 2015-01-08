@@ -745,6 +745,8 @@ class RulePN(BasicPetriNet):
             text += ' ' + arg
         
         text += ')'
+        
+        return text
     
     def _handle_task(self, lst):
         
@@ -880,20 +882,17 @@ class RulePN(BasicPetriNet):
         return '(task (plan ?pnpdt_planName__) (action_type {0}) (params{1}) (step {2} $?pnpdt_steps__) (parent {3})'.format(lst[1], text, step, parent)
                                   
     def _handle_command(self, lst):
-        text = ''
         
-        symbol = lst[2][0]
-        params = lst[2][1:]
+        params = lst[2][0]
+        symbol = lst[2][1]
         
-        for arg in params:
-            if arg in self._main_transition._func_dict:
-                arg = self._get_func_text(self._main_transition._func_dict[arg])
-            text += ' ' + arg
+        if params in self._main_transition._func_dict:
+            params = self._get_func_text(self._main_transition._func_dict[params])
         
-        if not text:
-            text = ""
+        if symbol in self._main_transition._func_dict:
+            symbol = self._get_func_text(self._main_transition._func_dict[symbol])
         
-        return '(send-command "{0}" {1} {2})'.format(lst[1], symbol, text)
+        return '(send-command "{0}" {1} {2})'.format(lst[1], symbol, params)
     
     def _handle_task_status_effect(self, lst):
         
