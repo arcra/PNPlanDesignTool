@@ -3358,13 +3358,18 @@ class ExecutionPNEditor(CancelationPNEditor):
         kwargs['is_primitive_task'] = True
         
         CancelationPNEditor.__init__(self, parent, *args, **kwargs)
+    
+    def _configure_menus(self):
+        CancelationPNEditor._configure_menus(self)
+        
+        self._menus_dict[RuleTransition.__name__] = ['preconditions_operations', 'fact_operations', 'task_operations', 'command_operations', 'task_status_effect_operations', 'generic_transition_properties', 'generic_transition_connections']  # @UndefinedVariable
 
-class FinalizationPNEditor(CancelationPNEditor):
+class FinalizationPNEditor(ExecutionPNEditor):
     
     PetriNetClass = FinalizationPN
     
     def _configure_menus(self):
-        CancelationPNEditor._configure_menus(self)
+        ExecutionPNEditor._configure_menus(self)
         
         self._menus_options_sets_dict['task_status_operations'].append(
                                                              ('Make Generic Task Status', self._make_generic_task_status)
