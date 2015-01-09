@@ -760,7 +760,7 @@ class RulePN(BasicPetriNet):
         if not text:
             text = ' ""'
         
-        return '(task (id ?pnpdt_task__) (plan ?pnpdt_planName__) (action_type {0}) (params{1}) (step ?pnpdt_step__ $?pnpdt_steps__) (parent ?pnpdt_parent__)'.format(lst[1], text)
+        return '(task (id ?pnpdt_task__) (plan ?pnpdt_planName__) (action_type {0}) (params{1}) (step ?pnpdt_step__ $?pnpdt_steps__) (parent ?pnpdt_parent__) )'.format(lst[1], text)
     
     def _handle_fact(self, lst):
         text = ''
@@ -879,7 +879,7 @@ class RulePN(BasicPetriNet):
             parent = '?pnpdt_task__'
             step = str(lst[3]) + ' ?pnpdt_step__'
         
-        return '(task (plan ?pnpdt_planName__) (action_type {0}) (params{1}) (step {2} $?pnpdt_steps__) (parent {3})'.format(lst[1], text, step, parent)
+        return '(task (plan ?pnpdt_planName__) (action_type {0}) (params{1}) (step {2} $?pnpdt_steps__) (parent {3}) )'.format(lst[1], text, step, parent)
                                   
     def _handle_command(self, lst):
         
