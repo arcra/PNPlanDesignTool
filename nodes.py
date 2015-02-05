@@ -389,14 +389,14 @@ class StructuredFactPlace(FactPlace):
     def _get_effects(self):
         return self._get_description()
 
-class PrimitiveTaskPlace(BaseFactPlace):
+class TaskPlace(BaseFactPlace):
     
     FILL_COLOR = '#FF6600'
     OUTLINE_COLOR = '#DD4400'
-    PREFIX = 'pt'
+    PREFIX = 't'
     
     def can_connect_to(self, target, weight):
-        super(PrimitiveTaskPlace, self).can_connect_to(target, weight)
+        super(TaskPlace, self).can_connect_to(target, weight)
         if target.__class__ not in [SequenceTransition, RuleTransition]:
             raise Exception('TASK places cannot connect to a transition that is not of type SEQUENCE.')
         
@@ -415,13 +415,6 @@ class PrimitiveTaskPlace(BaseFactPlace):
         name = self.name[:pos]
         params = [p.strip() for p in self.name[pos+1:-1].split(',')]
         return ['task', name, params]
-        
-
-class NonPrimitiveTaskPlace(PrimitiveTaskPlace):
-    
-    FILL_COLOR = '#EEEE00'
-    OUTLINE_COLOR = '#AAAA00'
-    PREFIX = 'npt'
 
 class CommandPlace(BaseFactPlace):
     
@@ -537,6 +530,40 @@ class FunctionPlace(BaseFactPlace):
         args = m.group('args')
         return (m.group('result'), [m.group('func')] + self.PARAMS_REGEX.findall(args))
 
+class FunctionCallPlace(BaseFactPlace):
+    
+    FILL_COLOR = '#66EE00'
+    OUTLINE_COLOR = '#44AA00'
+    PREFIX = 'fncCall'
+    REGEX = re.compile(r'fncCall\s*\(\s*(?P<func>[^\s,\?]+)(?P<args>(\s*,\s*(([-]?[0-9]+(\.[0-9]+)?)|(\??[a-zA-Z][a-zA-Z0-9_]*)|("[^"]*")))+)\s*\)')
+    
+    @classmethod
+    def _get_new_node_name(cls):
+        return 'fncCall(func_name, op1, ...)'
+    
+    def can_connect_to(self, target, weight):
+        raise Exception('FUNCTION CALL Places cannot connect to anything.')
+    
+    def _validate_name(self, val):
+        #Assert
+        if not self.REGEX.match(val):
+            raise Exception("A FUNCTION CALL Place must be named fncCall(<function_name>, <operand1>, ..., <operandN>).")
+    
+    def _get_bound_vars(self):
+        return set()
+    
+    def _get_unbound_vars(self):
+        m = self.REGEX.match(self.name)
+        args = m.group('args')
+        return set(self.VARS_REGEX.findall(args))
+    
+    def _get_description(self):
+        
+        m = self.REGEX.match(self.name)
+        func = m.group('func')
+        args = self.PARAMS_REGEX.findall(m.group('args'))
+        return ['fncCall', func, args]
+
 class ComparisonPlace(BaseFactPlace):
     
     FILL_COLOR = '#00EE00'
@@ -649,8 +676,7 @@ class NandPlace(BaseFactPlace):
 PLACE_CLASSES = (Place,
                  FactPlace,
                  StructuredFactPlace,
-                 PrimitiveTaskPlace,
-                 NonPrimitiveTaskPlace,
+                 TaskPlace,
                  CommandPlace,
                  FunctionPlace,
                  ComparisonPlace,
@@ -666,7 +692,7 @@ class Transition(Node):
     OUTLINE_COLOR = '#444444'
     PREFIX = 'regular'
     
-    def __init__(self, name, position = Vec2(), isHorizontal = False, rate = 1.0, priority = 1):
+    def __init__(self, name, position = Vec2(), isHorizontal = False, rate = 1.0, priority = 0):
         
         """Transition constructor
         
@@ -928,7 +954,7 @@ class RuleTransition(BaseRuleTransition):
             
             unbound_vars = None
             
-            if arc.source.__class__ in [PrimitiveTaskPlace, NonPrimitiveTaskPlace]:
+            if arc.source.__class__ is TaskPlace:
                 unbound_vars = (arc.source._get_unbound_vars() - self._bound_vars)
                 if not unbound_vars:
                     first_arcs.insert(0, arc.source._get_description())
@@ -1017,8 +1043,7 @@ class AndTransition(BaseRuleTransition):
         super(AndTransition, self).can_connect_to(target, weight)
         
         if target.__class__ not in [OrPlace, NandPlace, FactPlace,
-                                    StructuredFactPlace, PrimitiveTaskPlace,
-                                    NonPrimitiveTaskPlace, TaskStatusPlace]:
+                                    StructuredFactPlace, TaskPlace, TaskStatusPlace]:
             raise Exception('AND transitions can only connect to an OR place, a NAND place, or a precondition Fact, Task or TaskStatus places.')
     
     def _get_description(self, bound_vars):
@@ -1148,7 +1173,7 @@ class SequenceTransition(BaseRuleTransition):
     
     def can_connect_to(self, target, weight):
         super(SequenceTransition, self).can_connect_to(target, weight)
-        if target.__class__ not in [NonPrimitiveTaskPlace, PrimitiveTaskPlace]:
+        if target.__class__ is not TaskPlace:
             raise Exception('SEQUENCE transitions cannot connect to places that are not TASK places.')
 
 TRANSITION_CLASSES = (Transition,

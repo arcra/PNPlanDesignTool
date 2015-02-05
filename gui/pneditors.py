@@ -9,13 +9,13 @@ import tkFont
 import tkMessageBox
 
 from copy import deepcopy
-from petrinets import BasicPetriNet, DecompositionPN, ExecutionPN,\
+from petrinets import BasicPetriNet, DexecPN,\
     FinalizationPN, CancelationPN, RulePN
 from nodes import Place, Transition, TRANSITION_CLASSES, PLACE_CLASSES,\
-    NonPrimitiveTaskPlace, SequenceTransition,\
-    PrimitiveTaskPlace, FactPlace, StructuredFactPlace, OrPlace, AndTransition,\
+    TaskPlace, SequenceTransition, FactPlace,\
+    StructuredFactPlace, OrPlace, AndTransition,\
     RuleTransition, TaskStatusPlace, CommandPlace, NandPlace, FunctionPlace,\
-    ComparisonPlace
+    ComparisonPlace, FunctionCallPlace
 from settings import *
 from utils import Vec2
 from auxdialogs import PositiveIntDialog, NonNegativeFloatDialog, NonNegativeIntDialog
@@ -151,6 +151,8 @@ class BasicPNEditor(Tkinter.Canvas):
     
     def _create_menus(self):
         
+        self._aux_menus_dict = {}
+        
         self._menus_options_sets_dict = {
                                        'canvas' : [
                                                    ('Add Place', self._create_regular_place),
@@ -175,10 +177,10 @@ class BasicPNEditor(Tkinter.Canvas):
                                                         ],
                                        'generic_transition_properties' : [
                                                                ('Rename Transition', self._rename_transition),
-                                                               ('Switch orientation', self._switch_orientation)
+                                                               ('Switch orientation', self._switch_orientation),
+                                                               ('Set Priority', self._set_priority)
                                                                #,
                                                                #('Set Rate', self._set_rate),
-                                                               #('Set Priority', self._set_priority)
                                                             ],
                                        'generic_transition_operations' : [
                                                                ('Remove Transition', self._remove_transition)
@@ -213,22 +215,37 @@ class BasicPNEditor(Tkinter.Canvas):
         for menu, components in self._menus_dict.iteritems():
             if not components:
                 continue
-            current_menu = Tkinter.Menu(self, tearoff = 0)
-            current_component = components[0]
+            
+            self._menus_dict[menu] = self._build_menu(components)
+    
+    def _build_menu(self, components, parent = None):
+        
+        if parent:
+            parent_widget = parent
+        else:
+            parent_widget = self
+        current_menu = Tkinter.Menu(parent_widget, tearoff = 0, takefocus = 1)
+        current_component = components[0]
+        for el in self._menus_options_sets_dict[current_component]:
+            if len(el) > 2:
+                current_menu.add_command(label = el[0], command = el[1], accelerator = el[2])
+            elif len(el) > 1:
+                current_menu.add_command(label = el[0], command = el[1])
+            else:
+                cascading_menu = self._build_menu(self._aux_menus_dict[el[0]], parent = current_menu)
+                current_menu.add_cascade(label = current_component, menu = cascading_menu)
+        for current_component in components[1:]:
+            current_menu.add_separator()
             for el in self._menus_options_sets_dict[current_component]:
                 if len(el) > 2:
                     current_menu.add_command(label = el[0], command = el[1], accelerator = el[2])
-                else:
+                elif len(el) > 1:
                     current_menu.add_command(label = el[0], command = el[1])
-            for current_component in components[1:]:
-                current_menu.add_separator()
-                for el in self._menus_options_sets_dict[current_component]:
-                    if len(el) > 2:
-                        current_menu.add_command(label = el[0], command = el[1], accelerator = el[2])
-                    else:
-                        current_menu.add_command(label = el[0], command = el[1])
-            
-            self._menus_dict[menu] = current_menu
+                else:
+                    cascading_menu = self._build_menu(self._aux_menus_dict[el[0]], parent = current_menu)
+                    current_menu.add_cascade(label = current_component, menu = cascading_menu)
+        
+        return current_menu
     
     def _toggle_grid(self):
         self._grid = not self._grid
@@ -1297,7 +1314,7 @@ class BasicPNEditor(Tkinter.Canvas):
         transition_id = self._get_transition_id()
         t = self._petri_net.transitions[transition_id]
         
-        dialog = PositiveIntDialog("Set transition's priority", 'Write a positive integer for \nthe priority of transition: ' + str(t), 'Priority', init_value = t.priority)
+        dialog = NonNegativeIntDialog("Set transition's priority", 'Write a non-negative integer for \nthe priority of transition: ' + str(t), 'Priority', init_value = t.priority)
         dialog.window.transient(self)
         self.wait_window(dialog.window)
         if dialog.value_set and t.priority != int(dialog.input_var.get()):
@@ -2039,8 +2056,8 @@ class BasicPNEditor(Tkinter.Canvas):
             tags = self.gettags(item)
             self._last_clicked_id = item
             
-            for tag in self._menus_dict:
-                if tag in tags:
+            for tag in tags:
+                if tag in self._menus_dict:
                     self._popped_up_menu = self._menus_dict[tag]
                     break
         
@@ -2399,15 +2416,13 @@ class RulePNEditor(RegularPNEditor):
         
         self._petri_net = kwargs.pop('PetriNet', None)
         petri_net_name = kwargs.pop('name', None)
-        petri_net_task = kwargs.pop('task', None)
         petri_net_class = kwargs.pop('PetriNetClass', None)
-        is_primitive_task = kwargs.pop('is_primitive_task', False)
         
-        if not ((petri_net_name and petri_net_task and petri_net_class) or self._petri_net):
-            raise Exception('Either a PetriNet object or a name, a task name and a Petri Net class must be passed to the Petri Net Editor.')
+        if not ((petri_net_name and petri_net_class) or self._petri_net):
+            raise Exception('Either a PetriNet object or a name and a Petri Net class must be passed to the Petri Net Editor.')
         
         if not self._petri_net:
-            self._petri_net = petri_net_class(petri_net_name, petri_net_task, is_primitive_task)
+            self._petri_net = petri_net_class(petri_net_name)
     
     def _configure_menus(self):
         
@@ -2418,45 +2433,40 @@ class RulePNEditor(RegularPNEditor):
         
         #ADD options
         
-        self._menus_options_sets_dict['preconditions_operations'] = [
+        self._menus_options_sets_dict['Preconditions'] = [('preconditions_operations',)]
+        
+        self._menus_options_sets_dict['positive_preconditions_operations'] = [
                                                              ('Add Fact Precondition', self._add_fact_precondition),
-                                                             ('Add NEGATAED Fact Precondition', self._add_negated_fact),
                                                              ('Add Structured Fact Precondition', self._add_structured_fact),
+                                                             ('Add OR Precondition', self._add_or),
+                                                             ('Add Function', self._add_func),
+                                                             ('Add Comparison', self._add_cmp)
+                                                            ]
+        self._menus_options_sets_dict['negative_preconditions_operations'] = [
+                                                             ('Add NEGATAED Fact Precondition', self._add_negated_fact),
                                                              ('Add NEGATED Structured Fact Precondition', self._add_negated_structured_fact),
                                                              ('Add NAND Precondition', self._add_nand),
-                                                             ('Add OR Precondition', self._add_or),
-                                                             ('Add NOR Precondition', self._add_nor),
-                                                             ('Add Function', self._add_func),
-                                                             ('Add Comparison', self._add_cmp),
-                                                             ('Add Response precondition', self._add_response),
-                                                             ('Add NEGATED Response precondition', self._add_negated_response)
+                                                             ('Add NOR Precondition', self._add_nor)
                                                             ]
         self._menus_options_sets_dict['fact_operations'] = [
                                                              ('Add Fact', self._add_fact),
-                                                             ('Add Structured Fact', self._add_structured_fact)
-                                                            ]
-        
-        self._menus_options_sets_dict['task_operations'] = [
-                                                             ('Add Non-Primitive Task', self._add_non_primitive_task),
-                                                             ('Add Primitive Task', self._add_primitive_task)
+                                                             ('Add Structured Fact', self._add_structured_fact),
+                                                             ('Add Function Call', self._add_function_call)
+                                                             
                                                             ]
         self._menus_options_sets_dict['or_operations'] = [
                                                              ('Add AND Transition', self._add_transition)
                                                             ]
-        self._menus_options_sets_dict['command_operations'] = [
-                                                             ('Add Command', self._add_command)
-                                                            ]
         
-        self._menus_dict[RuleTransition.__name__] = ['preconditions_operations', 'fact_operations', 'task_operations', 'generic_transition_properties', 'generic_transition_connections']  # @UndefinedVariable
-        self._menus_dict[SequenceTransition.__name__] = ['task_operations', 'generic_transition_properties', 'generic_transition_operations', 'generic_transition_connections']  # @UndefinedVariable
-        self._menus_dict[AndTransition.__name__] = ['preconditions_operations', 'generic_transition_properties', 'generic_transition_operations', 'generic_transition_connections']  # @UndefinedVariable
-        self._menus_dict[NonPrimitiveTaskPlace.__name__] = ['generic_place_properties', 'generic_place_operations', 'generic_place_connections']  # @UndefinedVariable
-        self._menus_dict[PrimitiveTaskPlace.__name__] = ['generic_place_properties', 'generic_place_operations', 'generic_place_connections']  # @UndefinedVariable
+        
+        self._aux_menus_dict['preconditions_operations'] = ['positive_preconditions_operations', 'negative_preconditions_operations']
+        
+        self._menus_dict[RuleTransition.__name__] = ['Preconditions', 'fact_operations', 'generic_transition_properties', 'generic_transition_connections']  # @UndefinedVariable
+        self._menus_dict[AndTransition.__name__] = ['positive_preconditions_operations', 'negative_preconditions_operations', 'generic_transition_properties', 'generic_transition_operations', 'generic_transition_connections']  # @UndefinedVariable
         self._menus_dict[FactPlace.__name__] = ['generic_place_properties', 'generic_place_operations', 'generic_place_connections']  # @UndefinedVariable
         self._menus_dict[StructuredFactPlace.__name__] = ['generic_place_properties', 'generic_place_operations', 'generic_place_connections']  # @UndefinedVariable
         self._menus_dict[OrPlace.__name__] = ['or_operations', 'generic_place_operations', 'generic_place_connections']  # @UndefinedVariable
         self._menus_dict[NandPlace.__name__] = ['generic_place_operations', 'generic_place_connections']  # @UndefinedVariable
-        self._menus_dict[CommandPlace.__name__] = ['generic_place_properties', 'generic_place_operations']  # @UndefinedVariable
         self._menus_dict[FunctionPlace.__name__] = ['generic_place_properties', 'generic_place_operations']  # @UndefinedVariable
         self._menus_dict[ComparisonPlace.__name__] = ['generic_place_properties', 'generic_place_operations']  # @UndefinedVariable
     
@@ -2468,10 +2478,6 @@ class RulePNEditor(RegularPNEditor):
         self.grab_release()
         
         #Call other left_click handlers
-        
-        if self._state == 'adding_task':
-            self._finish_adding_task(event)
-            return True
         
         if self._state == 'adding_fact_precondition':
             self._finish_adding_fact_precondition(event)
@@ -2493,6 +2499,10 @@ class RulePNEditor(RegularPNEditor):
             self._finish_adding_fact(event)
             return True
         
+        if self._state == 'adding_fncCall':
+            self._finish_adding_fncCall(event)
+            return True
+        
         if self._state == 'adding_nand':
             self._finish_adding_nand(event)
             return True
@@ -2507,10 +2517,6 @@ class RulePNEditor(RegularPNEditor):
         
         if self._state == 'adding_transition':
             self._finish_adding_transition(event)
-            return True
-        
-        if self._state == 'adding_command':
-            self._finish_adding_command(event)
             return True
         
         if self._state == 'adding_func':
@@ -2548,51 +2554,6 @@ class RulePNEditor(RegularPNEditor):
         self.delete('connecting_arc')
         self.unbind('<Motion>', self._connecting_node_fn_id)
         self.unbind('<Motion>', self._adding_node_fn_id)
-    
-    def _add_non_primitive_task(self):
-        self._add_task(NonPrimitiveTaskPlace)
-    
-    def _add_primitive_task(self):
-        self._add_task(PrimitiveTaskPlace)
-        
-    def _add_task(self, PlaceClass):
-        self._state = 'adding_task'
-        self.grab_set()
-        self._anchor_set = True
-        self._anchor_tag = 'selection'
-        
-        #Create drawing of place
-        p_position = self._last_point
-        t_position = p_position +Vec2(100, 0)
-        dummy_transition = SequenceTransition('dummy', t_position)
-        npt_id = self._draw_place_item(p_position, PlaceClass)
-        t_id = self._draw_transition_item(transition = dummy_transition)
-        
-        place_vec = t_position - p_position
-        place_point = p_position + place_vec.unit*PLACE_RADIUS*self._current_scale
-        dummy_transition = SequenceTransition('dummy', t_position)
-        transition_point = self._find_intersection(dummy_transition, p_position)
-        
-        arc_id = self.create_line(place_point.x,
-                     place_point.y,
-                     transition_point.x,
-                     transition_point.y,
-                     tags = ['selection'],
-                     width = LINE_WIDTH,
-                     arrow= Tkinter.LAST,
-                     arrowshape = (10,12,5) )
-        
-        self.addtag_withtag('selection', npt_id)
-        self.addtag_withtag('selection', t_id)
-        self.addtag_withtag('selection', arc_id)
-        
-        transition_id = self._get_transition_id(self._last_clicked_id)
-        
-        self._connecting_t = self._petri_net.transitions[transition_id]
-        self._place_class = PlaceClass
-        
-        self._adding_node_fn_id = self.bind('<Motion>', self._dragCallback, '+')
-        self._connecting_node_fn_id = self.bind('<Motion>', self._connecting_transition_to_place, '+')
     
     def _add_fact_precondition(self):
         self._add_fact_place_precondition(FactPlace)
@@ -2694,6 +2655,24 @@ class RulePNEditor(RegularPNEditor):
         
         self._connecting_t = self._petri_net.transitions[transition_id]
         self._place_class = PlaceClass
+        
+        self._adding_node_fn_id = self.bind('<Motion>', self._dragCallback, '+')
+        self._connecting_node_fn_id = self.bind('<Motion>', self._connecting_transition_to_place, '+')
+    
+    def _add_function_call(self):
+        self._state = 'adding_fncCall'
+        self.grab_set()
+        self._anchor_set = True
+        self._anchor_tag = 'selection'
+        
+        #Create drawing of place
+        p_position = self._last_point
+        fact_id = self._draw_place_item(p_position, FunctionCallPlace)
+        self.addtag_withtag('selection', fact_id)
+        
+        transition_id = self._get_transition_id(self._last_clicked_id)
+        
+        self._connecting_t = self._petri_net.transitions[transition_id]
         
         self._adding_node_fn_id = self.bind('<Motion>', self._dragCallback, '+')
         self._connecting_node_fn_id = self.bind('<Motion>', self._connecting_transition_to_place, '+')
@@ -2925,25 +2904,6 @@ class RulePNEditor(RegularPNEditor):
         self._adding_node_fn_id = self.bind('<Motion>', self._dragCallback, '+')
         self._connecting_node_fn_id = self.bind('<Motion>', self._connecting_transition_to_or_place, '+')
     
-    def _add_command(self):
-        self._state = 'adding_command'
-        self.grab_set()
-        self._anchor_set = True
-        self._anchor_tag = 'selection'
-        
-        #Create drawing of place
-        p_position = self._last_point
-        place_id = self._draw_place_item(p_position, CommandPlace)
-        
-        self.addtag_withtag('selection', place_id)
-        
-        transition_id = self._get_transition_id(self._last_clicked_id)
-        
-        self._connecting_t = self._petri_net.transitions[transition_id]
-        
-        self._adding_node_fn_id = self.bind('<Motion>', self._dragCallback, '+')
-        self._connecting_node_fn_id = self.bind('<Motion>', self._connecting_transition_to_place, '+')
-    
     def _connecting_transition_to_place(self, event):
         
         self.delete('connecting_arc')
@@ -3043,15 +3003,6 @@ class RulePNEditor(RegularPNEditor):
                          origin.y + radius,
                          tags = ['connecting_arc'],
                          width = LINE_WIDTH)
-            
-    def _finish_adding_task(self, event):        
-        try:
-            self._create_place(self._place_class, afterFunction = self._add_task_arc, afterCancelFunction = self._cancel_create_place)
-        except Exception as e:
-            tkMessageBox.showerror('Creation Error', str(e))
-        finally:
-            self.unbind('<Motion>', self._connecting_node_fn_id)
-            self.unbind('<Motion>', self._adding_node_fn_id)
     
     def _finish_adding_fact_precondition(self, event):
         try:
@@ -3118,6 +3069,15 @@ class RulePNEditor(RegularPNEditor):
     def _finish_adding_fact(self, event):
         try:
             self._create_place(self._place_class, afterFunction = self._add_simple_place_arc, afterCancelFunction = self._cancel_create_place)
+        except Exception as e:
+            tkMessageBox.showerror('Creation Error', str(e))
+        finally:
+            self.unbind('<Motion>', self._connecting_node_fn_id)
+            self.unbind('<Motion>', self._adding_node_fn_id)
+    
+    def _finish_adding_fncCall(self, event):
+        try:
+            self._create_place(FunctionCallPlace, afterFunction = self._add_simple_place_arc, afterCancelFunction = self._cancel_create_place)
         except Exception as e:
             tkMessageBox.showerror('Creation Error', str(e))
         finally:
@@ -3202,24 +3162,6 @@ class RulePNEditor(RegularPNEditor):
             self.unbind('<Motion>', self._connecting_node_fn_id)
             self.unbind('<Motion>', self._adding_node_fn_id)
     
-    def _finish_adding_command(self, event):
-        try:
-            self._create_place(CommandPlace, afterFunction = self._add_simple_place_arc, afterCancelFunction = self._cancel_create_place)
-        except Exception as e:
-            tkMessageBox.showerror('Creation Error', str(e))
-        finally:
-            self.unbind('<Motion>', self._connecting_node_fn_id)
-            self.unbind('<Motion>', self._adding_node_fn_id)
-    
-    def _add_task_arc(self, p):
-        self.delete('selection')
-        self.delete('connecting_arc')
-        
-        t = SequenceTransition('SeqT{0}'.format(self._petri_net._transition_counter + 1), p.position + Vec2(100, 0))
-        self.add_transition(t)
-        self.add_arc(p, t)
-        self.add_arc(self._connecting_t, p)
-    
     def _add_fact_precondition_arc(self, p):
         self.delete('selection')
         self.delete('connecting_arc')
@@ -3245,28 +3187,37 @@ class RulePNEditor(RegularPNEditor):
         self.delete('selection')
         self.delete('connecting_arc')
 
-class DecompositionPNEditor(RulePNEditor):
+class PlanningRulePNEditor(RulePNEditor):
     
-    PetriNetClass = DecompositionPN
-    
-    def __init__(self, parent, *args, **kwargs):
+    def _create_petri_net(self, kwargs):
         
-        kwargs['is_primitive_task'] = False
+        self._petri_net = kwargs.pop('PetriNet', None)
+        petri_net_name = kwargs.pop('name', None)
+        petri_net_task = kwargs.pop('task', None)
+        petri_net_class = kwargs.pop('PetriNetClass', None)
         
-        RulePNEditor.__init__(self, parent, *args, **kwargs)
-    
-    def _configure_menus(self):
-        RulePNEditor._configure_menus(self)
+        if not ((petri_net_name and petri_net_task and petri_net_class) or self._petri_net):
+            raise Exception('Either a PetriNet object or a name, a task name and a Petri Net class must be passed to the Petri Net Editor.')
         
-        self._menus_dict[RuleTransition.__name__] = ['preconditions_operations', 'fact_operations', 'task_operations', 'generic_transition_properties', 'generic_transition_connections']  # @UndefinedVariable
-    
-class CancelationPNEditor(RulePNEditor):
+        if not self._petri_net:
+            self._petri_net = petri_net_class(petri_net_name, petri_net_task)
+
+class CancelationPNEditor(PlanningRulePNEditor):
     
     PetriNetClass = CancelationPN
     
     def _configure_menus(self):
-        RulePNEditor._configure_menus(self)
+        PlanningRulePNEditor._configure_menus(self)
         
+        self._menus_options_sets_dict['positive_preconditions_operations'].append(
+                                                                            ('Add Response precondition', self._add_response)
+                                                                        )
+        self._menus_options_sets_dict['negative_preconditions_operations'].append(
+                                                                            ('Add NEGATED Response precondition', self._add_negated_response)
+                                                                        )
+        self._menus_options_sets_dict['command_operations'] = [
+                                                             ('Add Command', self._add_command)
+                                                            ]
         self._menus_options_sets_dict['task_status_operations'] = [
                                                              ('Make Successful', self._make_successful),
                                                              ('Make Failed', self._make_failed)
@@ -3279,9 +3230,20 @@ class CancelationPNEditor(RulePNEditor):
                                                                           ('Add Successful Place', self._add_successful),
                                                                           ('Add Failed Place', self._add_failed)
                                                                         ]
-        self._menus_dict[RuleTransition.__name__] = ['preconditions_operations', 'fact_operations', 'command_operations', 'task_status_effect_operations', 'generic_transition_properties', 'generic_transition_connections']  # @UndefinedVariable
-        self._menus_dict[TaskStatusPlace.__name__] = ['task_status_operations', 'task_status_place_connections']  # @UndefinedVariable
-    
+        
+        self._menus_dict[RuleTransition.__name__] = ['Preconditions',   # @UndefinedVariable
+                                                     'fact_operations',
+                                                     'command_operations',
+                                                     'task_status_effect_operations',
+                                                     'generic_transition_properties',
+                                                     'generic_transition_connections'
+                                                     ]
+        self._menus_dict[TaskStatusPlace.__name__] = ['task_status_operations',         # @UndefinedVariable
+                                                      'task_status_place_connections'
+                                                      ]
+        self._menus_dict[CommandPlace.__name__] = ['generic_place_properties',          # @UndefinedVariable
+                                                   'generic_place_operations'
+                                                   ]
     
     def _left_click_handlers(self, event):
         
@@ -3292,6 +3254,10 @@ class CancelationPNEditor(RulePNEditor):
         
         if self._state == 'adding_task_status':
             self._finish_adding_task_status(event)
+            return True
+        
+        if self._state == 'adding_command':
+            self._finish_adding_command(event)
             return True
     
     def _add_successful(self):
@@ -3319,6 +3285,25 @@ class CancelationPNEditor(RulePNEditor):
         self._adding_node_fn_id = self.bind('<Motion>', self._dragCallback, '+')
         self._connecting_node_fn_id = self.bind('<Motion>', self._connecting_transition_to_place, '+')
     
+    def _add_command(self):
+        self._state = 'adding_command'
+        self.grab_set()
+        self._anchor_set = True
+        self._anchor_tag = 'selection'
+        
+        #Create drawing of place
+        p_position = self._last_point
+        place_id = self._draw_place_item(p_position, CommandPlace)
+        
+        self.addtag_withtag('selection', place_id)
+        
+        transition_id = self._get_transition_id(self._last_clicked_id)
+        
+        self._connecting_t = self._petri_net.transitions[transition_id]
+        
+        self._adding_node_fn_id = self.bind('<Motion>', self._dragCallback, '+')
+        self._connecting_node_fn_id = self.bind('<Motion>', self._connecting_transition_to_place, '+')
+    
     def _finish_adding_task_status(self, event):
         try:
             pos = Vec2(event.x, event.y)
@@ -3330,6 +3315,15 @@ class CancelationPNEditor(RulePNEditor):
             self.add_place(p)
             self.add_arc(self._connecting_t, p)
             
+        except Exception as e:
+            tkMessageBox.showerror('Creation Error', str(e))
+        finally:
+            self.unbind('<Motion>', self._connecting_node_fn_id)
+            self.unbind('<Motion>', self._adding_node_fn_id)
+    
+    def _finish_adding_command(self, event):
+        try:
+            self._create_place(CommandPlace, afterFunction = self._add_simple_place_arc, afterCancelFunction = self._cancel_create_place)
         except Exception as e:
             tkMessageBox.showerror('Creation Error', str(e))
         finally:
@@ -3349,33 +3343,125 @@ class CancelationPNEditor(RulePNEditor):
         p.name = 'task_status(' + status + ')'
         self._draw_place(p)
 
-class ExecutionPNEditor(CancelationPNEditor):
+class DexecPNEditor(CancelationPNEditor):
     
-    PetriNetClass = ExecutionPN
+    PetriNetClass = DexecPN
     
     def __init__(self, parent, *args, **kwargs):
-        
-        kwargs['is_primitive_task'] = True
         
         CancelationPNEditor.__init__(self, parent, *args, **kwargs)
     
     def _configure_menus(self):
         CancelationPNEditor._configure_menus(self)
         
-        self._menus_dict[RuleTransition.__name__] = ['preconditions_operations', 'fact_operations', 'task_operations', 'command_operations', 'task_status_effect_operations', 'generic_transition_properties', 'generic_transition_connections']  # @UndefinedVariable
+        self._menus_options_sets_dict['task_operations'] = [
+                                                            ('Add Task', self._add_task)
+                                                        ]
+        
+        self._menus_dict[RuleTransition.__name__] = ['Preconditions',  # @UndefinedVariable
+                                                     'fact_operations',
+                                                     'task_operations',
+                                                     'command_operations',
+                                                     'task_status_effect_operations',
+                                                     'generic_transition_properties',
+                                                     'generic_transition_connections'
+                                                ]
+        self._menus_dict[TaskPlace.__name__] = ['generic_place_properties',  # @UndefinedVariable
+                                                'generic_place_operations',
+                                                'generic_place_connections'
+                                                ]
+        self._menus_dict[SequenceTransition.__name__] = ['task_operations',                 # @UndefinedVariable
+                                                         'generic_transition_properties',
+                                                         'generic_transition_operations',
+                                                         'generic_transition_connections'
+                                                         ]
+    
+    def _left_click_handlers(self, event):
+        
+        if CancelationPNEditor._left_click_handlers(self, event):
+            return True
+        
+        self.grab_release()
+        
+        #Call other left_click handlers
+        
+        if self._state == 'adding_task':
+            self._finish_adding_task(event)
+            return True
+        
+    def _add_task(self):
+        self._state = 'adding_task'
+        self.grab_set()
+        self._anchor_set = True
+        self._anchor_tag = 'selection'
+        
+        #Create drawing of place
+        p_position = self._last_point
+        t_position = p_position +Vec2(100, 0)
+        dummy_transition = SequenceTransition('dummy', t_position)
+        npt_id = self._draw_place_item(p_position, TaskPlace)
+        t_id = self._draw_transition_item(transition = dummy_transition)
+        
+        place_vec = t_position - p_position
+        place_point = p_position + place_vec.unit*PLACE_RADIUS*self._current_scale
+        dummy_transition = SequenceTransition('dummy', t_position)
+        transition_point = self._find_intersection(dummy_transition, p_position)
+        
+        arc_id = self.create_line(place_point.x,
+                     place_point.y,
+                     transition_point.x,
+                     transition_point.y,
+                     tags = ['selection'],
+                     width = LINE_WIDTH,
+                     arrow= Tkinter.LAST,
+                     arrowshape = (10,12,5) )
+        
+        self.addtag_withtag('selection', npt_id)
+        self.addtag_withtag('selection', t_id)
+        self.addtag_withtag('selection', arc_id)
+        
+        transition_id = self._get_transition_id(self._last_clicked_id)
+        
+        self._connecting_t = self._petri_net.transitions[transition_id]
+        
+        self._adding_node_fn_id = self.bind('<Motion>', self._dragCallback, '+')
+        self._connecting_node_fn_id = self.bind('<Motion>', self._connecting_transition_to_place, '+')
+    
+    def _finish_adding_task(self, event):        
+        try:
+            self._create_place(TaskPlace, afterFunction = self._add_task_arc, afterCancelFunction = self._cancel_create_place)
+        except Exception as e:
+            tkMessageBox.showerror('Creation Error', str(e))
+        finally:
+            self.unbind('<Motion>', self._connecting_node_fn_id)
+            self.unbind('<Motion>', self._adding_node_fn_id)
+    
+    def _add_task_arc(self, p):
+        self.delete('selection')
+        self.delete('connecting_arc')
+        
+        t = SequenceTransition('SeqT{0}'.format(self._petri_net._transition_counter + 1), p.position + Vec2(100, 0))
+        self.add_transition(t)
+        self.add_arc(p, t)
+        self.add_arc(self._connecting_t, p)
 
-class FinalizationPNEditor(ExecutionPNEditor):
+class FinalizationPNEditor(CancelationPNEditor):
     
     PetriNetClass = FinalizationPN
     
     def _configure_menus(self):
-        ExecutionPNEditor._configure_menus(self)
+        CancelationPNEditor._configure_menus(self)
         
         self._menus_options_sets_dict['task_status_operations'].append(
                                                              ('Make Generic Task Status', self._make_generic_task_status)
                                                             )
         
-        self._menus_dict[RuleTransition.__name__] = ['preconditions_operations', 'fact_operations', 'task_operations', 'generic_transition_properties', 'generic_transition_connections']  # @UndefinedVariable
+        self._menus_dict[RuleTransition.__name__] = ['Preconditions',  # @UndefinedVariable
+                                                     'fact_operations',
+                                                     'command_operations',
+                                                     'generic_transition_properties',
+                                                     'generic_transition_connections'
+                                                     ]
     
     def _make_generic_task_status(self):
         self._change_task_status('?')

@@ -10,8 +10,8 @@ import os
 import lxml.etree as ET
 
 from nodes import Place, Transition, _Arc, _get_treeElement,\
-    RuleTransition, SequenceTransition, TaskStatusPlace, NonPrimitiveTaskPlace,\
-    PrimitiveTaskPlace, FactPlace, StructuredFactPlace, CommandPlace
+    RuleTransition, SequenceTransition, TaskStatusPlace, TaskPlace,\
+    FactPlace, StructuredFactPlace, CommandPlace, FunctionCallPlace
 from utils import Vec2
 
 class BasicPetriNet(object):
@@ -258,12 +258,8 @@ class BasicPetriNet(object):
                         place_id = current_arc.get('source')
                         current_p = net.find('page//place[@id="' + place_id + '"]')
                         p_name = current_p.find('name').findtext('text')
-                        l = len(PrimitiveTaskPlace.PREFIX) + 1
-                        if p_name[:l] == PrimitiveTaskPlace.PREFIX + '.':
-                            p = current_p
-                            break
-                        l = len(NonPrimitiveTaskPlace.PREFIX) + 1
-                        if p_name[:l] == NonPrimitiveTaskPlace.PREFIX + '.':
+                        l = len(TaskPlace.PREFIX) + 1
+                        if p_name[:l] == TaskPlace.PREFIX + '.':
                             p = current_p
                             break
                     if p is None:
@@ -271,7 +267,7 @@ class BasicPetriNet(object):
                     else:
                         p.find('name/text').text = p_name[:l] + task
                 
-                pn = PetriNetClass(name, task, _net = net)
+                pn = PetriNetClass(name, task, _net = net, initialize = False)
             else:
                 pn = PetriNetClass(name, _net = net)
             
@@ -296,12 +292,16 @@ class BasicPetriNet(object):
                 for p_el in current.findall('place'):
                     p = Place.fromETreeElement(p_el)
                     pn.add_place(p)
+                    if p.name == task:
+                        pn._main_place = p
                     
                     renaming_places_dict[p_el.get('id')] = repr(p)
                     
                 for t_el in current.findall('transition'):
                     t = Transition.fromETreeElement(t_el)
                     pn.add_transition(t)
+                    if t.__class__ == RuleTransition:
+                        pn._main_transition = t
                     
                     renaming_transitions_dict[t_el.get('id')] = repr(t)
                 
@@ -561,10 +561,9 @@ class BasicPetriNet(object):
 
 class RulePN(BasicPetriNet):
     
-    def __init__(self, name, task, is_primitive_task = None, _net = None):
+    def __init__(self, name, _net = None, **kwargs):
         
         self._main_transition_ = None
-        self._main_place_ = None
         self._to_delete = []
         self._deleted_fact_count = 0
         
@@ -586,45 +585,19 @@ class RulePN(BasicPetriNet):
                                   'sfact': self._handle_sfact_effect,
                                   'task': self._handle_task_effect,
                                   'command': self._handle_command,
+                                  'fncCall': self._handle_fncCall,
                                   'task_status' : self._handle_task_status_effect
                                   }
         
         super(RulePN, self).__init__(name, _net)
         
-        self._task = task
-        if is_primitive_task is not None:
+        
+        if kwargs.pop('initialize', True):
             self._initialize()
-            if is_primitive_task:
-                self._main_place = PrimitiveTaskPlace(self.task, Vec2(150, 300))
-            else:
-                self._main_place = NonPrimitiveTaskPlace(self.task, Vec2(150, 300))
-            self.add_place(self._main_place)
-            self.add_arc(self._main_place, self._main_transition)
-            self.add_arc(self._main_transition, self._main_place)
     
     def _initialize(self):
         self._main_transition = RuleTransition('Rule', Vec2(350, 300))
         self.add_transition(self._main_transition)
-    
-    @property
-    def task(self):
-        return self._task
-    
-    @task.setter
-    def task(self, val):
-        if not val:
-            raise Exception('Task name cannot be an empty string.')
-        
-        for p in self.places.itervalues():
-            if p.name == self.task:
-                break
-        
-        if not p:
-            raise Exception('Parent Task Place was not found.')
-        
-        p.name = val
-        
-        self._task = val
     
     @property
     def _main_transition(self):
@@ -647,36 +620,14 @@ class RulePN(BasicPetriNet):
         
         self._main_transition_ = val
     
-    @property
-    def _main_place(self):
-        
-        if self._main_place_:
-            return self._main_place_
-        
-        for p in self.places.itervalues():
-            if p.name == self.task:
-                self._main_place_ = p
-                return self._main_place_
-        
-        raise Exception('Main Place was not found!')
-    
-    @_main_place.setter
-    def _main_place(self, val):
-        
-        if not isinstance(val, Place):
-            raise Exception("Main Place must be an object from Place Class or derived.")
-        
-        self._main_place_ = val
-    
     @classmethod
     def from_pnml_file(cls, filename, task):
-        BasicPetriNet.from_pnml_file(filename, PetriNetClass = cls, task = task)
+        return BasicPetriNet.from_pnml_file(filename, PetriNetClass = cls)
     
     def add_arc(self, source, target, weight = 1, _treeElement = None):
         
-        if isinstance(target, SequenceTransition) and len(target._incoming_arcs) > 0:
-            raise Exception('A Sequence Transition cannot have more than one task connected to it.\n\
-            If synchronization is needed, two hierarchy levels must be created.')
+        if isinstance(target, SequenceTransition):
+            raise Exception('A generic Rule PN cannot have arcs to SEQUENCE transitions.')
         
         return super(RulePN, self).add_arc(source, target, weight, _treeElement)
     
@@ -684,6 +635,7 @@ class RulePN(BasicPetriNet):
         
         '''
         (rule <task_name>-<rule_name>
+            <salience>
             <preconditions>
             =>
             (retract <vars>)
@@ -700,7 +652,7 @@ class RulePN(BasicPetriNet):
         self._to_delete = []
         
         preconditions = self._main_transition._get_preconditions(is_cancelation)
-        facts, tasks, commands = self._get_effects()
+        facts, tasks, functions = self._get_effects()
         
         task = self.task
         pos = self.task.find('(')
@@ -708,11 +660,13 @@ class RulePN(BasicPetriNet):
             task = task[:pos]
         
         rule = ['(defrule ' + task + '-' + self.name]
+        if self._main_transition.priority != 0:
+            rule += self._indent('(declare (salience ' + str(self._main_transition.priority) + '))')
         for el in preconditions:
             rule += self._indent(self._preconditions_handlers[el[0]](el))
         rule += self._indent('=>')
         if self._to_delete:
-            rule += self._indent('(retract' + ' '.join(self._to_delete) + ')')
+            rule += self._indent('(retract ' + ' '.join(self._to_delete) + ')')
         if facts or tasks:
             rule += self._indent('(assert')
             for f in facts:
@@ -720,8 +674,8 @@ class RulePN(BasicPetriNet):
             for t in tasks:
                 rule += self._indent(self._effects_handlers[t[0]](t), 2)
             rule += self._indent(')')
-        for c in commands:
-            rule += self._indent(self._effects_handlers[c[0]](c))
+        for f in functions:
+            rule += self._indent(self._effects_handlers[f[0]](f))
         rule += [')']
         
         return '\n'.join(rule)
@@ -760,7 +714,7 @@ class RulePN(BasicPetriNet):
         if not text:
             text = ' ""'
         
-        return '(task (id ?pnpdt_task__) (plan ?pnpdt_planName__) (action_type {0}) (params{1}) (step ?pnpdt_step__ $?pnpdt_steps__) (parent ?pnpdt_parent__) )'.format(lst[1], text)
+        return '(task (id ?pnpdt_task__) (plan ?pnpdt_planName__) (action_type {0}) (params{1}) (step $?pnpdt_steps__) )'.format(lst[1], text)
     
     def _handle_fact(self, lst):
         text = ''
@@ -872,12 +826,8 @@ class RulePN(BasicPetriNet):
         if not text:
             text = ' ""'
         
-        if lst[3] < 0:
-            parent = '?pnpdt_parent__'
-            step = '(- ?pnpdt_step__ ' + str(lst[3]*-1) + ')'
-        else:
-            parent = '?pnpdt_task__'
-            step = str(lst[3]) + ' ?pnpdt_step__'
+        parent = '?pnpdt_task__'
+        step = str(lst[3])
         
         return '(task (plan ?pnpdt_planName__) (action_type {0}) (params{1}) (step {2} $?pnpdt_steps__) (parent {3}) )'.format(lst[1], text, step, parent)
                                   
@@ -894,6 +844,17 @@ class RulePN(BasicPetriNet):
         
         return '(send-command "{0}" {1} {2})'.format(lst[1], symbol, params)
     
+    def _handle_fncCall(self, lst):
+        
+        params = []
+        
+        for p in lst[2]:
+            if p in self._main_transition._func_dict:
+                p = self._get_func_text(self._main_transition._func_dict[p])
+            params.append(p)
+        
+        return '({0} {1})'.format(lst[1], ' '.join(params))
+    
     def _handle_task_status_effect(self, lst):
         
         if lst[1] == '?':
@@ -907,7 +868,7 @@ class RulePN(BasicPetriNet):
         
         facts = []
         tasks = []
-        commands = []
+        functions = []
         unbound_vars = set()
         
         for arc in outgoing_arcs:
@@ -917,19 +878,19 @@ class RulePN(BasicPetriNet):
             
             unbound_vars |= (arc.target._get_unbound_vars() - self._main_transition._bound_vars)
             
-            if arc.target.__class__ in [PrimitiveTaskPlace, NonPrimitiveTaskPlace]:
+            if arc.target.__class__ is TaskPlace:
                 tasks += self._get_task_effects(arc)
             elif arc.target.__class__ in [FactPlace, StructuredFactPlace, TaskStatusPlace]:
                 facts.append(arc.target._get_description())
-            elif arc.target.__class__ is CommandPlace:
-                commands.append(arc.target._get_description())
+            elif arc.target.__class__ in [CommandPlace, FunctionCallPlace] :
+                functions.append(arc.target._get_description())
             else:
                 print 'Place was not parsed: ' + str(arc.target)
         
         if unbound_vars:
             raise Exception('The following unbound variables were found: ' + ', '.join(unbound_vars) + '.')
         
-        return (facts, tasks, commands)
+        return (facts, tasks, functions)
     
     def _get_task_effects(self, arc):
         
@@ -953,51 +914,83 @@ class RulePN(BasicPetriNet):
         
         return tasks
 
-class DecompositionPN(RulePN):
+class PlanningRulePN(RulePN):
+    
+    def __init__(self, name, task = None, **kwargs):
+        
+        super(PlanningRulePN, self).__init__(name, **kwargs)
+        
+        # Notice the underscore at the end.
+        self._main_place_ = None
+        self._task = task
+    
+    def _initialize(self):
+        
+        super(RulePN, self)._initialize()
+        
+        self._main_place = TaskPlace(self.task, Vec2(150, 300))
+        self.add_place(self._main_place)
+        self.add_arc(self._main_place, self._main_transition)
+        self.add_arc(self._main_transition, self._main_place)
+    
+    @property
+    def task(self):
+        return self._task
+    
+    @task.setter
+    def task(self, val):
+        if not val:
+            raise Exception('Task name cannot be an empty string.')
+        
+        place = None
+        for p in self.places.itervalues():
+            if p.name == self.task:
+                place = p
+                break
+        
+        if not place:
+            raise Exception('Parent Task Place was not found.')
+        
+        place.name = val
+        
+        self._task = val
+    
+    @property
+    def _main_place(self):
+        
+        if self._main_place_:
+            return self._main_place_
+        
+        for p in self.places.itervalues():
+            if p.name == self.task:
+                self._main_place_ = p
+                return self._main_place_
+        
+        raise Exception('Main Place was not found!')
+    
+    @_main_place.setter
+    def _main_place(self, val):
+        
+        if not isinstance(val, Place):
+            raise Exception("Main Place must be an object from Place Class or derived.")
+        
+        self._main_place_ = val
+    
+    def add_arc(self, source, target, weight = 1, _treeElement = None):
+        
+        if isinstance(target, SequenceTransition) and len(target._incoming_arcs) > 0:
+            raise Exception('A Sequence Transition cannot have more than one task connected to it.\n\
+            If synchronization is needed, two hierarchy levels must be created.')
+        
+        return super(RulePN, self).add_arc(source, target, weight, _treeElement)
+
+class DexecPN(PlanningRulePN):
     
     @classmethod
     def from_pnml_file(cls, filename, task):
         return BasicPetriNet.from_pnml_file(filename, PetriNetClass = cls, task = task)
 
-class ExecutionPN(RulePN):
-    
-    def __init__(self, name, task, is_primitive_task = None, _net = None):
-        
-        super(ExecutionPN, self).__init__(name, task, is_primitive_task, _net)
-    
-    @classmethod
-    def from_pnml_file(cls, filename, task):
-        return BasicPetriNet.from_pnml_file(filename, PetriNetClass = cls, task = task)
-    
-    def _get_task_effects(self, arc):
-        
-        offset = -1
-        
-        arcs = [arc]
-        tasks = []
-        
-        while arcs:
-            offset += 1
-            for arc in arcs:
-                t = arc.target._get_description()
-                t.append(offset)
-                tasks.append(t)
-            arcs2 = []
-            for arc in arcs:
-                #There should be only ONE sequence transition next to each task.
-                t = arc.target._outgoing_arcs.values()[0].target
-                arcs2 += t._outgoing_arcs.values()
-            arcs = arcs2
-        
-        for t in tasks:
-            t[3] -= offset
-        
-        return tasks
-
-class FinalizationPN(RulePN):
-    
-    def __init__(self, name, task, is_primitive_task = None, _net = None):
-        super(FinalizationPN, self).__init__(name, task, is_primitive_task, _net)
+class FinalizationPN(PlanningRulePN):
     
     def _initialize(self):
         
@@ -1020,10 +1013,9 @@ class FinalizationPN(RulePN):
     def from_pnml_file(cls, filename, task):
         return BasicPetriNet.from_pnml_file(filename, PetriNetClass = cls, task = task)
 
-class CancelationPN(RulePN):
+class CancelationPN(PlanningRulePN):
     
     def get_CLIPS_code(self):
-        
         return super(CancelationPN, self).get_clips_code(is_cancelation = True)
     
     @classmethod
