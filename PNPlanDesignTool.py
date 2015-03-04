@@ -178,37 +178,37 @@ class PNPDT(object):
         pne.focus_set()
     
     def popup_tasks_folder_menu(self, event):
-        self.clicked_element = self.project_tree.identify('item', event.x, event.y)
+        self.clicked_element = self.project_tree.identify('row', event.x, event.y)
         self.popped_up_menu = self.tasks_folder_menu
         self.popped_up_menu.post(event.x_root, event.y_root)
     
     def popup_rules_folder_menu(self, event):
-        self.clicked_element = self.project_tree.identify('item', event.x, event.y)
+        self.clicked_element = self.project_tree.identify('row', event.x, event.y)
         self.popped_up_menu = self.rules_folder_menu
         self.popped_up_menu.post(event.x_root, event.y_root)
     
     def popup_task_folder_menu(self, event):
-        self.clicked_element = self.project_tree.identify('item', event.x, event.y)
+        self.clicked_element = self.project_tree.identify('row', event.x, event.y)
         self.popped_up_menu = self.task_folder_menu
         self.popped_up_menu.post(event.x_root, event.y_root)
     
     def popup_dexec_menu(self, event):
-        self.clicked_element = self.project_tree.identify('item', event.x, event.y)
+        self.clicked_element = self.project_tree.identify('row', event.x, event.y)
         self.popped_up_menu = self.dexec_menu
         self.popped_up_menu.post(event.x_root, event.y_root)
     
     def popup_finalizing_menu(self, event):
-        self.clicked_element = self.project_tree.identify('item', event.x, event.y)
+        self.clicked_element = self.project_tree.identify('row', event.x, event.y)
         self.popped_up_menu = self.finalizing_menu
         self.popped_up_menu.post(event.x_root, event.y_root)
         
     def popup_canceling_menu(self, event):
-        self.clicked_element = self.project_tree.identify('item', event.x, event.y)
+        self.clicked_element = self.project_tree.identify('row', event.x, event.y)
         self.popped_up_menu = self.canceling_menu
         self.popped_up_menu.post(event.x_root, event.y_root)
     
     def popup_petri_net_menu(self, event):
-        self.clicked_element = self.project_tree.identify('item', event.x, event.y)
+        self.clicked_element = self.project_tree.identify('row', event.x, event.y)
         self.popped_up_menu = self.petri_net_menu
         self.popped_up_menu.post(event.x_root, event.y_root)
     
@@ -421,7 +421,7 @@ class PNPDT(object):
         self.project_tree.delete(old_id)
     
     def open_callback(self, event):
-        self.clicked_element = self.project_tree.identify('item', event.x, event.y)
+        self.clicked_element = self.project_tree.identify('row', event.x, event.y)
         self.open_petri_net()
     
     def open_petri_net(self, pne = None):
