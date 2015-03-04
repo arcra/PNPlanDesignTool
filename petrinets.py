@@ -124,7 +124,8 @@ class BasicPetriNet(object):
             el.getparent().remove(el)
         
         el = self._tree.find('//place[@id="' + key + '"]')
-        el.getparent().remove(el)
+        if el:
+            el.getparent().remove(el)
         
         p = self.places.pop(key)
         p._references.clear()
@@ -159,7 +160,8 @@ class BasicPetriNet(object):
             el.getparent().remove(el)
         
         el = self._tree.find('//transition[@id="' + key + '"]')
-        el.getparent().remove(el)
+        if el:
+            el.getparent().remove(el)
         
         t = self.transitions.pop(key)
         t._references.clear()
@@ -918,15 +920,16 @@ class PlanningRulePN(RulePN):
     
     def __init__(self, name, task = None, **kwargs):
         
+        self._task = task
+        
         super(PlanningRulePN, self).__init__(name, **kwargs)
         
         # Notice the underscore at the end.
         self._main_place_ = None
-        self._task = task
     
     def _initialize(self):
         
-        super(RulePN, self)._initialize()
+        super(PlanningRulePN, self)._initialize()
         
         self._main_place = TaskPlace(self.task, Vec2(150, 300))
         self.add_place(self._main_place)

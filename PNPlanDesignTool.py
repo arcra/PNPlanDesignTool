@@ -351,6 +351,10 @@ class PNPDT(object):
         
         item_id = self.clicked_element + name
         
+        if self.project_tree.exists(item_id):
+            tkMessageBox.showerror('ERROR', 'There is already a petri net with that name.')
+            return
+        
         item_tags = list(self.project_tree.item(self.clicked_element, "tags")) + ['petri_net']
         item_tags.remove('folder')
         try:
