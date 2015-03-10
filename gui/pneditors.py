@@ -729,6 +729,10 @@ class BasicPNEditor(Tkinter.Canvas):
     def name(self):
         return self._petri_net.name
     
+    @name.setter
+    def name(self, val):
+        self._petri_net.name = val
+    
     def disable(self):
         self._state = 'disabled'
         self.config(background = 'gray')
@@ -1492,10 +1496,15 @@ class BasicPNEditor(Tkinter.Canvas):
             point += diff
         
         canvas_id = self._draw_place_item(point, PlaceClass = PlaceClass)
+        
+        display_name = initial_name
+        if display_name is None:
+            display_name = PlaceClass._get_display_name()
+        
         p = PlaceClass(initial_name, point)
         
         txtbox = Tkinter.Entry(self)
-        txtbox.insert(0, str(p))
+        txtbox.insert(0, display_name)
         txtbox.selection_range(0, Tkinter.END)
         #extra padding because entry position refers to the center, not the corner
         label_padding = PLACE_LABEL_PADDING + 10
@@ -1540,7 +1549,7 @@ class BasicPNEditor(Tkinter.Canvas):
             self._last_point += diff
         
         canvas_id = self._draw_transition_item(self._last_point, TransitionClass)
-        t = TransitionClass('{0:0>3d}'.format(self._petri_net._transition_counter + 1), self._last_point)
+        t = TransitionClass('T{0:0>3d}'.format(self._petri_net._transition_counter + 1), self._last_point)
         
         txtbox = Tkinter.Entry(self)
         txtbox.insert(0, str(t))
@@ -2437,7 +2446,7 @@ class RulePNEditor(RegularPNEditor):
         
         self._menus_options_sets_dict['positive_preconditions_operations'] = [
                                                              ('Add Fact Precondition', self._add_fact_precondition),
-                                                             ('Add Structured Fact Precondition', self._add_structured_fact),
+                                                             ('Add Structured Fact Precondition', self._add_structured_fact_precondition),
                                                              ('Add OR Precondition', self._add_or),
                                                              ('Add Function', self._add_func),
                                                              ('Add Comparison', self._add_cmp)

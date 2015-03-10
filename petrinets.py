@@ -124,7 +124,7 @@ class BasicPetriNet(object):
             el.getparent().remove(el)
         
         el = self._tree.find('//place[@id="' + key + '"]')
-        if el:
+        if el is not None:
             el.getparent().remove(el)
         
         p = self.places.pop(key)
@@ -228,8 +228,9 @@ class BasicPetriNet(object):
             self.places[trgt]._incoming_arcs.pop(src, None)
         
         if arc and arc.hasTreeElement:
-            arc_el = arc.petri_net._tree.find('//*[@id="' + arc._treeElement + '"]')
-            arc_el.getparent().remove(arc_el)
+            arc_el = self._tree.find('//arc[@id="' + arc._treeElement + '"]')
+            if arc_el is not None:
+                arc_el.getparent().remove(arc_el)
 
     @classmethod
     def from_ElementTree(cls, et, name = None, PetriNetClass = None, task = None):
@@ -483,6 +484,11 @@ class BasicPetriNet(object):
     def to_ElementTree(self):
         
         net = self._tree.find('net')
+        
+        tmp = _get_treeElement(net, 'name')
+        tmp = _get_treeElement(tmp)
+        tmp.text = self.name
+        
         page = net.find('page')
         
         toolspecific = net.find('toolspecific[@tool="PNLab"]')
@@ -732,7 +738,7 @@ class RulePN(BasicPetriNet):
         text = ''
         
         for p in lst[2]:
-            text = ' (' + p[0]
+            text += ' (' + p[0]
             for arg in p[1]:
                 if arg in self._main_transition._func_dict:
                     arg = '=' + self._get_func_text(self._main_transition._func_dict[arg])

@@ -56,6 +56,10 @@ class Node(object):
     def _get_new_node_name(cls):
         return 'new_node'
     
+    @classmethod
+    def _get_display_name(cls):
+        return cls._get_new_node_name()
+    
     @property
     def name(self):
         """Returns the name of the node."""
@@ -351,20 +355,34 @@ class StructuredFactPlace(FactPlace):
                                     '\))' + 
                                 ')')
     #I've created a MONSTER!!!!
-    REGEX = re.compile(r'(?P<name>[a-zA-Z][a-zA-Z0-9_]*)\s*(?P<parenthesis>(\(' + 
-                       '\s*[a-zA-Z][a-zA-Z0-9_]*\s*:' + 
+    
+    #name of deftemplate
+    REGEX = re.compile(r'(?P<name>[a-zA-Z][a-zA-Z0-9_]*)\s*(?P<parenthesis>(\(' +
+                       # name of field / slot
+                       '\s*[a-zA-Z][a-zA-Z0-9_]*\s*:' +
+                       # value of field / slot
                        '\s*(' + 
-                            '(([-]?[0-9]+(\.[0-9]+)?)|((\$?\?)?[a-zA-Z][a-zA-Z0-9_]*)|("[^"]*"))|' + 
+                            # number, variable (multi or single), constant or string
+                            '(([-]?[0-9]+(\.[0-9]+)?)|((\$?\?)?[a-zA-Z][a-zA-Z0-9_]*)|("[^"]*"))|' +
+                            # nested parenthesis 
                             '\(' +
-                                '((\$?\?)|([-]?[0-9]+(\.[0-9]+)?)|((\$?\?)?[a-zA-Z][a-zA-Z0-9_]*)|("[^"]*"))' +  
+                                # number, variable (multi or single), constant or string
+                                '((\$?\?)|([-]?[0-9]+(\.[0-9]+)?)|((\$?\?)?[a-zA-Z][a-zA-Z0-9_]*)|("[^"]*"))' +
+                                # coma and some other param
                                 '(\s*,\s*((\$?\?)|([-]?[0-9]+(\.[0-9]+)?)|((\$?\?)?[a-zA-Z][a-zA-Z0-9_]*)|("[^"]*")))*' +  
                             '\)' + 
                         ')' + 
-                        '(\s*,\s*[a-zA-Z][a-zA-Z0-9_]*\s*:' + 
-                       '\s*(' + 
-                            '(([-]?[0-9]+(\.[0-9]+)?)|((\$?\?)?[a-zA-Z][a-zA-Z0-9_]*)|("[^"]*"))|' + 
+                        # name of field / slot
+                        '(\s*,\s*[a-zA-Z][a-zA-Z0-9_]*\s*:' +
+                        # value of field / slot 
+                       '\s*(' +
+                            # number, variable (multi or single), constant or string 
+                            '(([-]?[0-9]+(\.[0-9]+)?)|((\$?\?)?[a-zA-Z][a-zA-Z0-9_]*)|("[^"]*"))|' +
+                            # nested parenthesis  
                             '\(' +
+                                # number, variable (multi or single), constant or string
                                 '((\$?\?)|([-]?[0-9]+(\.[0-9]+)?)|((\$?\?)?[a-zA-Z][a-zA-Z0-9_]*)|("[^"]*"))' +  
+                                # coma and some other param
                                 '(\s*,\s*((\$?\?)|([-]?[0-9]+(\.[0-9]+)?)|((\$?\?)?[a-zA-Z][a-zA-Z0-9_]*)|("[^"]*")))*' +  
                             '\)' + 
                         '))*' + 
@@ -539,6 +557,10 @@ class FunctionCallPlace(BaseFactPlace):
     
     @classmethod
     def _get_new_node_name(cls):
+        return 'fncCall(func_name, ?op1, ?op2)'
+    
+    @classmethod
+    def _get_display_name(cls):
         return 'fncCall(func_name, op1, ...)'
     
     def can_connect_to(self, target, weight):
@@ -574,6 +596,10 @@ class ComparisonPlace(BaseFactPlace):
     
     @classmethod
     def _get_new_node_name(cls):
+        return 'cmp(neq, ?op1, ?op2)'
+    
+    @classmethod
+    def _get_display_name(cls):
         return 'cmp(operator, op1, op2)'
     
     def can_connect_to(self, target, weight):
@@ -1217,7 +1243,7 @@ class _Arc(object):
     
     def _merge_treeElement(self):
         
-        el = self.petri_net._tree.find('//*[@id="' + self._treeElement + '"]')
+        el = self.petri_net._tree.find('//arc[@id="' + self._treeElement + '"]')
         if el is None:
             print 'DEBUG - TE: ' + self._treeElement + ' - TreeName: ' + self.petri_net.name
             return
