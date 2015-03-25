@@ -2478,6 +2478,7 @@ class RulePNEditor(RegularPNEditor):
         self._menus_dict[NandPlace.__name__] = ['generic_place_operations', 'generic_place_connections']  # @UndefinedVariable
         self._menus_dict[FunctionPlace.__name__] = ['generic_place_properties', 'generic_place_operations']  # @UndefinedVariable
         self._menus_dict[ComparisonPlace.__name__] = ['generic_place_properties', 'generic_place_operations']  # @UndefinedVariable
+        self._menus_dict[FunctionCallPlace.__name__] = ['generic_place_properties', 'generic_place_operations']  # @UndefinedVariable
     
     def _left_click_handlers(self, event):
         

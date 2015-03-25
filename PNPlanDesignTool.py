@@ -115,6 +115,8 @@ class PNPDT(object):
         self.task_folder_menu = tk.Menu(self.root, tearoff = 0)
         self.task_folder_menu.add_command(label = 'Rename', command = self.rename_task)
         self.task_folder_menu.add_command(label = 'Export Task', command = self.export_task)
+        self.task_folder_menu.add_separator()
+        self.task_folder_menu.add_command(label = 'Delete', command = self.delete_task)
         
         self.dexec_menu = tk.Menu(self.root, tearoff = 0)
         self.dexec_menu.add_command(label = 'Add Rule', command = self.create_dexec_pn)
@@ -315,6 +317,15 @@ class PNPDT(object):
             return None
         
         return item_id
+    
+    def delete_task(self):
+        
+        item_id = self.clicked_element
+        
+        for folder in self.project_tree.get_children(item_id):
+            for pn in self.project_tree.get_children(folder):
+                self.delete_petri_net(pn)
+            self.project_tree.delete(item_id)
     
     def create_generic_pn(self):
         self.create_petri_net(PNEditorClass = RulePNEditor)
