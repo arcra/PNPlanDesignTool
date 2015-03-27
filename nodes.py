@@ -510,8 +510,8 @@ class TaskStatusPlace(BaseFactPlace):
 
 class FunctionPlace(BaseFactPlace):
     
-    FILL_COLOR = '#66EE00'
-    OUTLINE_COLOR = '#44AA00'
+    FILL_COLOR = '#66AA00'
+    OUTLINE_COLOR = '#447700'
     PREFIX = 'fnc'
     REGEX = re.compile(r'fnc\s*\(\s*(?P<func>[^\s,]+)(?P<args>(\s*,\s*(([-]?[0-9]+(\.[0-9]+)?)|(\??[a-zA-Z][a-zA-Z0-9_]*)|("[^"]*")))+)\s*,\s*(?P<result>(\?[a-zA-Z][a-zA-Z0-9_]*))\s*\)')
     
@@ -550,18 +550,19 @@ class FunctionPlace(BaseFactPlace):
 
 class FunctionCallPlace(BaseFactPlace):
     
-    FILL_COLOR = '#66EE00'
-    OUTLINE_COLOR = '#44AA00'
+    FILL_COLOR = '#EEEE00'
+    OUTLINE_COLOR = '#AAAA00'
     PREFIX = 'fncCall'
-    REGEX = re.compile(r'fncCall\s*\(\s*(?P<func>[^\s,\?]+)(?P<args>(\s*,\s*(([-]?[0-9]+(\.[0-9]+)?)|(\??[a-zA-Z][a-zA-Z0-9_]*)|("[^"]*")))+)\s*\)')
+    #REGEX = re.compile(r'fncCall\s*\(\s*(?P<func>[^\s,\?]+)(?P<args>(\s*,\s*(([-]?[0-9]+(\.[0-9]+)?)|(\??[a-zA-Z][a-zA-Z0-9_]*)|("[^"]*")))+)\s*\)')
+    REGEX = re.compile(r'(?P<func>[a-zA-Z][a-zA-Z0-9_-]+)\s*(\(\s*(?P<args>(([-]?[0-9]+(\.[0-9]+)?)|(\??[a-zA-Z][a-zA-Z0-9_]*)|("[^"]*"))(\s*,\s*(([-]?[0-9]+(\.[0-9]+)?)|(\??[a-zA-Z][a-zA-Z0-9_]*)|("[^"]*")))*)\s*\))?')
     
     @classmethod
     def _get_new_node_name(cls):
-        return 'fncCall(func_name, ?op1, ?op2)'
+        return 'func_name(?op1, ?op2)'
     
     @classmethod
     def _get_display_name(cls):
-        return 'fncCall(func_name, op1, ...)'
+        return 'func_name(op1, ...)'
     
     def can_connect_to(self, target, weight):
         raise Exception('FUNCTION CALL Places cannot connect to anything.')
@@ -577,6 +578,8 @@ class FunctionCallPlace(BaseFactPlace):
     def _get_unbound_vars(self):
         m = self.REGEX.match(self.name)
         args = m.group('args')
+        if args is None:
+            args = ''
         return set(self.VARS_REGEX.findall(args))
     
     def _get_description(self):
@@ -584,12 +587,14 @@ class FunctionCallPlace(BaseFactPlace):
         m = self.REGEX.match(self.name)
         func = m.group('func')
         args = self.PARAMS_REGEX.findall(m.group('args'))
+        if args is None:
+            args = ''
         return ['fncCall', func, args]
 
 class ComparisonPlace(BaseFactPlace):
     
-    FILL_COLOR = '#00EE00'
-    OUTLINE_COLOR = '#00AA00'
+    FILL_COLOR = '#EE0000'
+    OUTLINE_COLOR = '#AA0000'
     PREFIX = 'cmp'
     #NOTE: if regex (list of operators) changes, change exception messages.
     REGEX = re.compile(r'cmp\s*\(\s*(?P<operator>((>)|(>=)|(<)|(<=)|(=)|(<>)|(eq)|(neq)))\s*,\s*(?P<op1>(([-]?[0-9]+(\.[0-9]+)?)|(\??[a-zA-Z][a-zA-Z0-9_]*)|("[^"]*")))\s*,\s*(?P<op2>(([-]?[0-9]+(\.[0-9]+)?)|(\??[a-zA-Z][a-zA-Z0-9_]*)|("[^"]*")))\s*\)')
@@ -1248,6 +1253,6 @@ class _Arc(object):
         if el is None:
             print 'DEBUG - TE: ' + self._treeElement + ' - TreeName: ' + self.petri_net.name
             return
-        el.set('id', self.__repr__())
         weight = _get_treeElement(el, 'inscription')
         _get_treeElement(weight).text = str(self.weight)
+        el.set('id', self.__repr__())
