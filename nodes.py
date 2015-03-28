@@ -1256,3 +1256,4 @@ class _Arc(object):
         weight = _get_treeElement(el, 'inscription')
         _get_treeElement(weight).text = str(self.weight)
         el.set('id', self.__repr__())
+        self._treeElement = self.__repr__()

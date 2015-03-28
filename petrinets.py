@@ -160,7 +160,7 @@ class BasicPetriNet(object):
             el.getparent().remove(el)
         
         el = self._tree.find('//transition[@id="' + key + '"]')
-        if el:
+        if el is not None:
             el.getparent().remove(el)
         
         t = self.transitions.pop(key)
@@ -229,7 +229,9 @@ class BasicPetriNet(object):
         
         if arc and arc.hasTreeElement:
             arc_el = self._tree.find('//arc[@id="' + arc._treeElement + '"]')
-            if arc_el is not None:
+            if arc_el is None:
+                print 'Something is not right!'
+            else:
                 arc_el.getparent().remove(arc_el)
     
     @classmethod
@@ -304,8 +306,7 @@ class BasicPetriNet(object):
             
             generator = BasicPetriNet._get_consecutive_letter_generator()
             
-            first_queue = [net]
-            second_queue = []
+            queue = [net]
             
             #Since name clashes can occur, all nodes must be renamed after reading the file
             # (i. e. after creating all nodes AND ARCS correctly).
@@ -314,9 +315,9 @@ class BasicPetriNet(object):
             renaming_transitions_dict = {}
             renaming_transitions_dict_2 = {}
             
-            while first_queue:
-                current = first_queue.pop(0)
-                second_queue.append(current)
+            ### GET PLACES AND TRANSITIONS, AS WELL AS THEIR REFERENCES, AND GET THEIR NEW IDS
+            while queue:
+                current = queue.pop(0)
                 
                 for p_el in current.findall('place'):
                     p = Place.fromETreeElement(p_el)
@@ -340,79 +341,47 @@ class BasicPetriNet(object):
                 
                 pages = current.findall('page')
                 if pages:
-                    first_queue += pages
+                    queue += pages
             
-            while second_queue:
-                current = second_queue.pop(0)
+            for ref in net.findall('.//referencePlace'):
+                reference = ref
+                try:
+                    while reference.tag[:9] == 'reference':
+                        reference = net.find('.//*[@id="' + reference.get('ref') + '"]')
+                except:
+                    raise Exception("Referenced node '" + ref.get('ref') + "' was not found.")
                 
-                for ref in net.findall('.//referencePlace'):
-                    reference = ref
-                    try:
-                        while reference.tag[:9] == 'reference':
-                            reference = net.find('.//*[@id="' + reference.get('ref') + '"]')
-                    except:
-                        raise Exception("Referenced node '" + ref.get('ref') + "' was not found.")
-                    
-                    place_id = ref.get('id')
-                    pn._place_counter += 1
-                    new_id = 'P{:0>3d}'.format(pn._place_counter)
-                    
-                    temp_key = next(generator)
-                    renaming_places_dict[place_id] = temp_key
-                    renaming_places_dict_2[temp_key] = new_id
-                    
-                    temp_key = renaming_places_dict[reference.get('id')]
-                    pn.places[renaming_places_dict_2[temp_key]]._references.add(new_id)
+                place_id = ref.get('id')
+                pn._place_counter += 1
+                new_id = 'P{:0>3d}'.format(pn._place_counter)
                 
-                for ref in net.findall('.//referenceTransition'):
-                    reference = ref
-                    try:
-                        while reference.tag[:9] == 'reference':
-                            reference = net.find('.//*[@id="' + reference.get('ref') + '"]')
-                    except:
-                        raise Exception("Referenced node '" + ref.get('ref') + "' was not found.")
-                    
-                    transition_id = ref.get('id')
-                    pn._transition_counter += 1
-                    new_id = 'T{:0>3d}'.format(pn._transition_counter)
-                    
-                    temp_key = next(generator)
-                    renaming_transitions_dict[transition_id] = temp_key
-                    renaming_transitions_dict_2[temp_key] = new_id
-                    
-                    temp_key = renaming_transitions_dict[reference.get('id')]
-                    pn.transitions[renaming_transitions_dict_2[temp_key]]._references.add(new_id)
+                temp_key = next(generator)
+                renaming_places_dict[place_id] = temp_key
+                renaming_places_dict_2[temp_key] = new_id
                 
-                for arc in current.findall('arc'):
-                    source = net.find('.//*[@id="' + arc.get('source') + '"]')
-                    try:
-                        while source.tag[:9] == 'reference':
-                            source = net.find('.//*[@id="' + source.get('ref') + '"]')
-                    except:
-                        raise Exception("Referenced node '" + arc.get('source') + "' was not found.")
-                    
-                    target = net.find('.//*[@id="' + arc.get('target') + '"]')
-                    try:
-                        while target.tag[:9] == 'reference':
-                            target = net.find('.//*[@id="' + target.get('ref') + '"]')
-                    except:
-                        raise Exception("Referenced node '" + arc.get('target') + "' was not found.")
-                    
-                    if source.tag == 'place':
-                        temp_key = renaming_places_dict[source.get('id')]
-                        source = pn.places[renaming_places_dict_2[temp_key]]
-                        temp_key = renaming_transitions_dict[target.get('id')]
-                        target = pn.transitions[renaming_transitions_dict_2[temp_key]]
-                    else:
-                        temp_key = renaming_transitions_dict[source.get('id')]
-                        source = pn.transitions[renaming_transitions_dict_2[temp_key]]
-                        temp_key = renaming_places_dict[target.get('id')]
-                        target = pn.places[renaming_places_dict_2[temp_key]]
-                    try:
-                        weight = int(arc.find('inscription/text').text)
-                    except:
-                        weight = 1
-                    pn.add_arc(source, target, weight, arc.get('id'))
+                temp_key = renaming_places_dict[reference.get('id')]
+                pn.places[renaming_places_dict_2[temp_key]]._references.add(new_id)
+            
+            for ref in net.findall('.//referenceTransition'):
+                reference = ref
+                try:
+                    while reference.tag[:9] == 'reference':
+                        reference = net.find('.//*[@id="' + reference.get('ref') + '"]')
+                except:
+                    raise Exception("Referenced node '" + ref.get('ref') + "' was not found.")
+                
+                transition_id = ref.get('id')
+                pn._transition_counter += 1
+                new_id = 'T{:0>3d}'.format(pn._transition_counter)
+                
+                temp_key = next(generator)
+                renaming_transitions_dict[transition_id] = temp_key
+                renaming_transitions_dict_2[temp_key] = new_id
+                
+                temp_key = renaming_transitions_dict[reference.get('id')]
+                pn.transitions[renaming_transitions_dict_2[temp_key]]._references.add(new_id)
+            
+            ### RENAME PLACES AND TRANSITIONS, AS WELL AS THEIR REFERENCES, AND SUBSTITUTE ANY REFERENCE TO THEM
             
             for key, new_key in renaming_places_dict.iteritems():
                 p_el = net.find('.//place[@id="' + key + '"]')
@@ -454,6 +423,62 @@ class BasicPetriNet(object):
                 for e in net.findall('.//arc[@target="' + key + '"]'):
                     e.set('target', new_key)
                 t_el.set('id', new_key)
+            
+            ### GET ARC INFO TO THE PN AND UPDATE ARC INFO IN THE TE
+            
+            for arc in current.findall('arc'):
+                new_source_id = ''
+                if arc.get('source') in renaming_places_dict:
+                    tmp_key = renaming_places_dict[arc.get('source')]
+                    new_source_id = renaming_places_dict_2[tmp_key]
+                elif arc.get('source') in renaming_transitions_dict:
+                    tmp_key = renaming_transitions_dict[arc.get('source')]
+                    new_source_id = renaming_transitions_dict_2[tmp_key]
+                else:
+                    print "Something is wrong with an arc's source!!"
+                    continue
+                
+                new_target_id = ''
+                if arc.get('target') in renaming_places_dict:
+                    tmp_key = renaming_places_dict[arc.get('target')]
+                    new_target_id = renaming_places_dict_2[tmp_key]
+                elif arc.get('target') in renaming_transitions_dict:
+                    tmp_key = renaming_transitions_dict[arc.get('target')]
+                    new_target_id = renaming_transitions_dict_2[tmp_key]
+                else:
+                    print "Something is wrong with an arc's target!!"
+                    continue
+                
+                source = net.find('.//*[@id="' + new_source_id + '"]')
+                try:
+                    while source.tag[:9] == 'reference':
+                        source = net.find('.//*[@id="' + source.get('ref') + '"]')
+                except:
+                    raise Exception("Referenced node '" + arc.get('source') + "' was not found.")
+                
+                target = net.find('.//*[@id="' + new_target_id + '"]')
+                try:
+                    while target.tag[:9] == 'reference':
+                        target = net.find('.//*[@id="' + target.get('ref') + '"]')
+                except:
+                    raise Exception("Referenced node '" + arc.get('target') + "' was not found.")
+                
+                source_id = source.get('id')
+                target_id = target.get('id')
+                
+                if source.tag == 'place':
+                    source = pn.places[source_id]
+                    target = pn.transitions[target_id]
+                else:
+                    source = pn.transitions[source_id]
+                    target = pn.places[target_id]
+                try:
+                    weight = int(arc.find('inscription/text').text)
+                except:
+                    weight = 1
+                new_arc_id = source_id + '_' + target_id
+                arc.set('id', new_arc_id)
+                pn.add_arc(source, target, weight, new_arc_id)
             
             pnets.append(pn)
         

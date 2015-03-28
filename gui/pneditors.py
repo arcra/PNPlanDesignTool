@@ -133,7 +133,13 @@ class BasicPNEditor(Tkinter.Canvas):
     '''
     def _test(self, event):
         item = self._get_current_item(event)
-        print [item] + list(self.gettags(item))
+        tags = list(self.gettags(item))
+        for tag in tags:
+            if tag[:6] == 'place_':
+                print 'Place id: ' + repr(self._petri_net.places[tag[6:]])
+            elif tag[:11] == 'transition_':
+                print 'Transition id: ' + repr(self._petri_net.transitions[tag[11:]])
+        print [item] + tags
     '''
     
     def _create_petri_net(self, kwargs):
