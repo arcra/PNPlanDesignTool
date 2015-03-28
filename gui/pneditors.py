@@ -3022,7 +3022,7 @@ class RulePNEditor(RegularPNEditor):
     
     def _finish_adding_fact_precondition(self, event):
         try:
-            self._create_place(self._place_class, afterFunction = self._add_fact_precondition_arc, afterCancelFunction = self._cancel_create_place)
+            self._create_place(self._place_class, afterFunction = self._add_simple_precondition_arc, afterCancelFunction = self._cancel_create_place)
         except Exception as e:
             tkMessageBox.showerror('Creation Error', str(e))
         finally:
@@ -3032,7 +3032,7 @@ class RulePNEditor(RegularPNEditor):
     def _finish_adding_response(self, event):
         try:
             self._create_place(FactPlace,
-                               afterFunction = self._add_fact_precondition_arc,
+                               afterFunction = self._add_simple_precondition_arc,
                                afterCancelFunction = self._cancel_create_place,
                                initial_name = 'BB_answer("command", ?symbol, result, ?params)'
                                )
@@ -3177,12 +3177,6 @@ class RulePNEditor(RegularPNEditor):
         finally:
             self.unbind('<Motion>', self._connecting_node_fn_id)
             self.unbind('<Motion>', self._adding_node_fn_id)
-    
-    def _add_fact_precondition_arc(self, p):
-        self.delete('selection')
-        self.delete('connecting_arc')
-        self.add_arc(p, self._connecting_t)
-        self.add_arc(self._connecting_t, p)
     
     def _add_negated_fact_arc(self, p):
         self.delete('selection')
