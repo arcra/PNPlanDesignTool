@@ -427,36 +427,15 @@ class BasicPetriNet(object):
             ### GET ARC INFO TO THE PN AND UPDATE ARC INFO IN THE TE
             
             for arc in current.findall('arc'):
-                new_source_id = ''
-                if arc.get('source') in renaming_places_dict:
-                    tmp_key = renaming_places_dict[arc.get('source')]
-                    new_source_id = renaming_places_dict_2[tmp_key]
-                elif arc.get('source') in renaming_transitions_dict:
-                    tmp_key = renaming_transitions_dict[arc.get('source')]
-                    new_source_id = renaming_transitions_dict_2[tmp_key]
-                else:
-                    print "Something is wrong with an arc's source!!"
-                    continue
                 
-                new_target_id = ''
-                if arc.get('target') in renaming_places_dict:
-                    tmp_key = renaming_places_dict[arc.get('target')]
-                    new_target_id = renaming_places_dict_2[tmp_key]
-                elif arc.get('target') in renaming_transitions_dict:
-                    tmp_key = renaming_transitions_dict[arc.get('target')]
-                    new_target_id = renaming_transitions_dict_2[tmp_key]
-                else:
-                    print "Something is wrong with an arc's target!!"
-                    continue
-                
-                source = net.find('.//*[@id="' + new_source_id + '"]')
+                source = net.find('.//*[@id="' + arc.get('source') + '"]')
                 try:
                     while source.tag[:9] == 'reference':
                         source = net.find('.//*[@id="' + source.get('ref') + '"]')
                 except:
                     raise Exception("Referenced node '" + arc.get('source') + "' was not found.")
                 
-                target = net.find('.//*[@id="' + new_target_id + '"]')
+                target = net.find('.//*[@id="' + arc.get('target') + '"]')
                 try:
                     while target.tag[:9] == 'reference':
                         target = net.find('.//*[@id="' + target.get('ref') + '"]')
