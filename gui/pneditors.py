@@ -443,23 +443,39 @@ class BasicPNEditor(Tkinter.Canvas):
             old_scale = action[-1]
             p = action[2]
             p.position = self._offset + (p.position - old_offset)/old_scale*self._current_scale
-            self.add_place(p)
+            
+            #self.add_place(p)        #This changes the id, so I had to do it "manually"
+            #add_place with old_id
+            p._incoming_arcs = {}
+            p._outgoing_arcs = {}
+            self._petri_net.places[repr(p)] = p
+            p.petri_net = self._petri_net
+            self._draw_place(p)
+            
             action[-2] = self._offset
             action[-1] = self._current_scale
             for arc in action[3].itervalues():
                 src = self._petri_net.transitions[repr(arc.source)]
                 trgt = self._petri_net.places[repr(arc.target)]
-                self.add_arc(src, trgt, arc.weight, _treeElement = arc._treeElement)
+                self.add_arc(src, trgt, arc.weight)
             for arc in action[4].itervalues():
                 src = self._petri_net.places[repr(arc.source)]
                 trgt = self._petri_net.transitions[repr(arc.target)]
-                self.add_arc(src, trgt, arc.weight, _treeElement = arc._treeElement)
+                self.add_arc(src, trgt, arc.weight)
         elif action[0] == 'remove_transition':
             old_offset = action[-2]
             old_scale = action[-1]
             t = action[2]
             t.position = self._offset + (t.position - old_offset)/old_scale*self._current_scale
-            self.add_transition(t)
+            
+            #self.add_transition(t)        #This changes the id, so I had to do it "manually"
+            #add_transition with old_id
+            t._incoming_arcs = {}
+            t._outgoing_arcs = {}
+            self._petri_net.transitions[repr(t)] = t
+            t.petri_net = self._petri_net
+            self._draw_transition(t)
+            
             action[-2] = self._offset
             action[-1] = self._current_scale
             for arc in action[3].itervalues():
@@ -3321,9 +3337,13 @@ class CancelationPNEditor(PlanningRulePNEditor):
             status = 'failed'
             if self._is_successful:
                 status = 'successful'
+            
             p = TaskStatusPlace('task_status(' + status + ')', pos)
             self.add_place(p)
             self.add_arc(self._connecting_t, p)
+            
+            self.delete('selection')
+            self.delete('connecting_arc')
             
         except Exception as e:
             tkMessageBox.showerror('Creation Error', str(e))
