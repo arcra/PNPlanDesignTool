@@ -179,6 +179,19 @@ class PNPDT(object):
         self.status_label.configure(textvariable = pne.status_var)
         pne.focus_set()
     
+    def _update_state_bar(self, text):
+        try:
+            tab_id = self.tab_manager.select()
+            if not tab_id:
+                raise Exception()
+            pne = self.tab_manager.widget_dict[tab_id]
+            stat_bar = pne.status_var
+        except:
+            self.status_label.configure(textvariable = self.status_var)
+            stat_bar = self.status_var
+        
+        stat_bar.set(text)
+    
     def popup_tasks_folder_menu(self, event):
         self.clicked_element = self.project_tree.identify('row', event.x, event.y)
         self.popped_up_menu = self.tasks_folder_menu
@@ -507,7 +520,8 @@ class PNPDT(object):
         os.rmdir(tmp_dir)
         zip_file.close()
         
-        self.status_var.set('Imported task: ' + task_name)
+        
+        self._update_state_bar('Imported task: ' + task_name)
     
     def import_from_PNML(self):
         
@@ -711,17 +725,8 @@ class PNPDT(object):
         os.rmdir(tmp_dir)
         zip_file.close()
         
-        try:
-            tab_id = self.tab_manager.select()
-            if not tab_id:
-                raise Exception()
-        except:
-            self.status_label.configure(textvariable = self.status_var)
-            self.status_var.set('Exported Task: ' + zip_filename)
-            return
         
-        pne = self.tab_manager.widget_dict[tab_id]
-        pne.status_var.set('Exported Task: ' + zip_filename)
+        self._update_state_bar('Exported Task: ' + zip_filename)
     
     def export_to_PNML(self):
         
@@ -774,6 +779,8 @@ class PNPDT(object):
         if not zip_filename:
             return
         
+        self._update_state_bar('Loading...')
+        
         tasks = self.project_tree.get_children('Tasks/')
         
         for t in tasks:
@@ -816,7 +823,7 @@ class PNPDT(object):
         os.rmdir(tmp_dir)
         zip_file.close()
         
-        self.status_var.set('Opened: ' + self.file_path)
+        self._update_state_bar('Opened: ' + self.file_path)
     
     def save(self, event = None):
         if not self.file_path:
@@ -828,6 +835,9 @@ class PNPDT(object):
         except:
             tkMessageBox.showerror('Error opening file.', 'A problem ocurred while opening a file for writing, make sure the file is not open by other program before saving.')
             return
+        
+        self._update_state_bar('Saving...')
+        
         tmp_dir = tempfile.mkdtemp()
         
         for t in self.project_tree.get_children('Tasks/'):
@@ -862,17 +872,7 @@ class PNPDT(object):
         os.rmdir(tmp_dir)
         zip_file.close()
         
-        try:
-            tab_id = self.tab_manager.select()
-            if not tab_id:
-                raise Exception()
-        except:
-            self.status_label.configure(textvariable = self.status_var)
-            self.status_var.set('File saved: ' + self.file_path)
-            return
-        
-        pne = self.tab_manager.widget_dict[tab_id]
-        pne.status_var.set('File saved: ' + self.file_path)
+        self._update_state_bar('File saved: ' + self.file_path)
     
     def save_as(self):
         zip_filename = tkFileDialog.asksaveasfilename(
