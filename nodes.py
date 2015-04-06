@@ -292,7 +292,7 @@ class BaseFactPlace(Place):
     
     __metaclass__ = abc.ABCMeta
     
-    REGEX = re.compile(r'(?P<name>[a-zA-Z][a-zA-Z0-9_]*)\s*(?P<parenthesis>(\(\s*(([-]?[0-9]+(\.[0-9]+)?)|(\$?\?)|((\$?\?)?[a-zA-Z][a-zA-Z0-9_]*)|("[^"]*"))(\s*,\s*(([-]?[0-9]+(\.[0-9]+)?)|(\$?\?)|((\$?\?)?[a-zA-Z][a-zA-Z0-9_]*)|("[^"]*")))*\s*\))?)')
+    REGEX = re.compile(r'(?P<name>[a-zA-Z][a-zA-Z0-9_]*)\s*(?P<parenthesis>(\(\s*(([-]?[0-9]+(\.[0-9]+)?)|(\$?\?)|((\$?\?)?[a-zA-Z][a-zA-Z0-9_]*)|("([^\\"]|\\.)*"))(\s*,\s*(([-]?[0-9]+(\.[0-9]+)?)|(\$?\?)|((\$?\?)?[a-zA-Z][a-zA-Z0-9_]*)|("([^\\"]|\\.)*")))*\s*\))?)')
     PARAMS_REGEX = re.compile(r'[^\s,][^\s,]*')
     VARS_REGEX = re.compile(r'\?[a-zA-Z][a-zA-Z0-9_]*')
     
@@ -348,10 +348,10 @@ class StructuredFactPlace(FactPlace):
     OUTLINE_COLOR = '#AA0077'
     PREFIX = 'sfact'
     STRUTURED_PARAMS_REGEX = re.compile(r'(?P<name>[a-zA-Z][a-zA-Z0-9_]*)\s*:\s*(' + 
-                                    '(?P<single>(([-]?[0-9]+(\.[0-9]+)?)|((\$?\?)?[a-zA-Z][a-zA-Z0-9_]*)|("[^"]*")))|' + 
+                                    '(?P<single>(([-]?[0-9]+(\.[0-9]+)?)|((\$?\?)?[a-zA-Z][a-zA-Z0-9_]*)|("([^\\"]|\\.)*")))|' + 
                                     '(?P<multi>\(' +
-                                        '((\$?\?)|([-]?[0-9]+(\.[0-9]+)?)|((\$?\?)?[a-zA-Z][a-zA-Z0-9_]*)|("[^"]*"))' +  
-                                        '(\s*,\s*((\$?\?)|([-]?[0-9]+(\.[0-9]+)?)|((\$?\?)?[a-zA-Z][a-zA-Z0-9_]*)|("[^"]*")))*' +  
+                                        '((\$?\?)|([-]?[0-9]+(\.[0-9]+)?)|((\$?\?)?[a-zA-Z][a-zA-Z0-9_]*)|("([^\\"]|\\.)*"))' +  
+                                        '(\s*,\s*((\$?\?)|([-]?[0-9]+(\.[0-9]+)?)|((\$?\?)?[a-zA-Z][a-zA-Z0-9_]*)|("([^\\"]|\\.)*")))*' +  
                                     '\))' + 
                                 ')')
     #I've created a MONSTER!!!!
@@ -363,13 +363,13 @@ class StructuredFactPlace(FactPlace):
                        # value of field / slot
                        '\s*(' + 
                             # number, variable (multi or single), constant or string
-                            '(([-]?[0-9]+(\.[0-9]+)?)|((\$?\?)?[a-zA-Z][a-zA-Z0-9_]*)|("[^"]*"))|' +
+                            '(([-]?[0-9]+(\.[0-9]+)?)|((\$?\?)?[a-zA-Z][a-zA-Z0-9_]*)|("([^\\"]|\\.)*"))|' +
                             # nested parenthesis 
                             '\(' +
                                 # number, variable (multi or single), constant or string
-                                '((\$?\?)|([-]?[0-9]+(\.[0-9]+)?)|((\$?\?)?[a-zA-Z][a-zA-Z0-9_]*)|("[^"]*"))' +
+                                '((\$?\?)|([-]?[0-9]+(\.[0-9]+)?)|((\$?\?)?[a-zA-Z][a-zA-Z0-9_]*)|("([^\\"]|\\.)*"))' +
                                 # coma and some other param
-                                '(\s*,\s*((\$?\?)|([-]?[0-9]+(\.[0-9]+)?)|((\$?\?)?[a-zA-Z][a-zA-Z0-9_]*)|("[^"]*")))*' +  
+                                '(\s*,\s*((\$?\?)|([-]?[0-9]+(\.[0-9]+)?)|((\$?\?)?[a-zA-Z][a-zA-Z0-9_]*)|("([^\\"]|\\.)*")))*' +  
                             '\)' + 
                         ')' + 
                         # name of field / slot
@@ -377,13 +377,13 @@ class StructuredFactPlace(FactPlace):
                         # value of field / slot 
                        '\s*(' +
                             # number, variable (multi or single), constant or string 
-                            '(([-]?[0-9]+(\.[0-9]+)?)|((\$?\?)?[a-zA-Z][a-zA-Z0-9_]*)|("[^"]*"))|' +
+                            '(([-]?[0-9]+(\.[0-9]+)?)|((\$?\?)?[a-zA-Z][a-zA-Z0-9_]*)|("([^\\"]|\\.)*"))|' +
                             # nested parenthesis  
                             '\(' +
                                 # number, variable (multi or single), constant or string
-                                '((\$?\?)|([-]?[0-9]+(\.[0-9]+)?)|((\$?\?)?[a-zA-Z][a-zA-Z0-9_]*)|("[^"]*"))' +  
+                                '((\$?\?)|([-]?[0-9]+(\.[0-9]+)?)|((\$?\?)?[a-zA-Z][a-zA-Z0-9_]*)|("([^\\"]|\\.)*"))' +  
                                 # coma and some other param
-                                '(\s*,\s*((\$?\?)|([-]?[0-9]+(\.[0-9]+)?)|((\$?\?)?[a-zA-Z][a-zA-Z0-9_]*)|("[^"]*")))*' +  
+                                '(\s*,\s*((\$?\?)|([-]?[0-9]+(\.[0-9]+)?)|((\$?\?)?[a-zA-Z][a-zA-Z0-9_]*)|("([^\\"]|\\.)*")))*' +  
                             '\)' + 
                         '))*' + 
                         '\s*\))?)')
@@ -439,7 +439,7 @@ class CommandPlace(BaseFactPlace):
     FILL_COLOR = '#99FF66'
     OUTLINE_COLOR = '#77DD44'
     PREFIX = 'cmd'
-    REGEX = re.compile(r'(?P<name>[a-zA-Z][a-zA-Z0-9_]*)\s*(?P<parenthesis>(\(\s*((\?[a-zA-Z][a-zA-Z0-9_]*)|("[^"]*"))\s*,\s*(\??[a-zA-Z][a-zA-Z0-9_]*)(\s*,\s*((\?[a-zA-Z][a-zA-Z0-9_]*)|([0-9]+))){0,2}\s*\)))')
+    REGEX = re.compile(r'(?P<name>[a-zA-Z][a-zA-Z0-9_]*)\s*(?P<parenthesis>(\(\s*((\?[a-zA-Z][a-zA-Z0-9_]*)|("([^\\"]|\\.)*"))\s*,\s*(\??[a-zA-Z][a-zA-Z0-9_]*)(\s*,\s*((\?[a-zA-Z][a-zA-Z0-9_]*)|([0-9]+))){0,2}\s*\)))')
     
     @classmethod
     def _get_new_node_name(cls):
@@ -513,7 +513,8 @@ class FunctionPlace(BaseFactPlace):
     FILL_COLOR = '#66AA00'
     OUTLINE_COLOR = '#447700'
     PREFIX = 'fnc'
-    REGEX = re.compile(r'fnc\s*\(\s*(?P<func>[^\s,]+)(?P<args>(\s*,\s*(([-]?[0-9]+(\.[0-9]+)?)|(\??[a-zA-Z][a-zA-Z0-9_]*)|("[^"]*")))+)\s*,\s*(?P<result>(\?[a-zA-Z][a-zA-Z0-9_]*))\s*\)')
+    #REGEX = re.compile(r'fnc\s*\(\s*(?P<func>[^\s,]+)(?P<args>(\s*,\s*(([-]?[0-9]+(\.[0-9]+)?)|(\??[a-zA-Z][a-zA-Z0-9_]*)|("[^"]*")))+)\s*,\s*(?P<result>(\?[a-zA-Z][a-zA-Z0-9_]*))\s*\)')
+    REGEX = re.compile(r'fnc\s*\(\s*(?P<func>[^\s,]+)(?P<args>(\s*,\s*(([-]?[0-9]+(\.[0-9]+)?)|(\??[a-zA-Z][a-zA-Z0-9_]*)|("([^\\"]|\\.)*")))+)\s*,\s*(?P<result>(\?[a-zA-Z][a-zA-Z0-9_]*))\s*\)')
     
     @classmethod
     def _get_new_node_name(cls):
@@ -554,7 +555,7 @@ class FunctionCallPlace(BaseFactPlace):
     OUTLINE_COLOR = '#AAAA00'
     PREFIX = 'fncCall'
     #REGEX = re.compile(r'fncCall\s*\(\s*(?P<func>[^\s,\?]+)(?P<args>(\s*,\s*(([-]?[0-9]+(\.[0-9]+)?)|(\??[a-zA-Z][a-zA-Z0-9_]*)|("[^"]*")))+)\s*\)')
-    REGEX = re.compile(r'(?P<func>[a-zA-Z][a-zA-Z0-9_-]+)\s*(\(\s*(?P<args>(([-]?[0-9]+(\.[0-9]+)?)|(\??[a-zA-Z][a-zA-Z0-9_]*)|("[^"]*"))(\s*,\s*(([-]?[0-9]+(\.[0-9]+)?)|(\??[a-zA-Z][a-zA-Z0-9_]*)|("[^"]*")))*)\s*\))?')
+    REGEX = re.compile(r'(?P<func>[a-zA-Z][a-zA-Z0-9_-]+)\s*(\(\s*(?P<args>(([-]?[0-9]+(\.[0-9]+)?)|(\??[a-zA-Z][a-zA-Z0-9_]*)|("([^\\"]|\\.)*"))(\s*,\s*(([-]?[0-9]+(\.[0-9]+)?)|(\??[a-zA-Z][a-zA-Z0-9_]*)|("([^\\"]|\\.)*")))*)\s*\))?')
     
     @classmethod
     def _get_new_node_name(cls):
@@ -597,7 +598,7 @@ class ComparisonPlace(BaseFactPlace):
     OUTLINE_COLOR = '#AA0000'
     PREFIX = 'cmp'
     #NOTE: if regex (list of operators) changes, change exception messages.
-    REGEX = re.compile(r'cmp\s*\(\s*(?P<operator>((>)|(>=)|(<)|(<=)|(=)|(<>)|(eq)|(neq)))\s*,\s*(?P<op1>(([-]?[0-9]+(\.[0-9]+)?)|(\??[a-zA-Z][a-zA-Z0-9_]*)|("[^"]*")))\s*,\s*(?P<op2>(([-]?[0-9]+(\.[0-9]+)?)|(\??[a-zA-Z][a-zA-Z0-9_]*)|("[^"]*")))\s*\)')
+    REGEX = re.compile(r'cmp\s*\(\s*(?P<operator>((>)|(>=)|(<)|(<=)|(=)|(<>)|(eq)|(neq)))\s*,\s*(?P<op1>(([-]?[0-9]+(\.[0-9]+)?)|(\??[a-zA-Z][a-zA-Z0-9_]*)|("([^\\"]|\\.)*")))\s*,\s*(?P<op2>(([-]?[0-9]+(\.[0-9]+)?)|(\??[a-zA-Z][a-zA-Z0-9_]*)|("([^\\"]|\\.)*")))\s*\)')
     
     @classmethod
     def _get_new_node_name(cls):
