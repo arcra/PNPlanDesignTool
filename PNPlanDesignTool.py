@@ -251,6 +251,15 @@ class PNPDT(object):
             count += 1
         return count
     
+    def _get_sorting_order(self, element, lst):
+        
+        for i in range(len(lst)):
+            if lst[i] > element:
+                return i
+        
+        return 'end'
+        
+    
     def _get_ext_and_filetype(self, element):
         
         item_tags = self.project_tree.item(element, 'tags')
@@ -306,13 +315,14 @@ class PNPDT(object):
         try:
             tags = ['folder', 'task_' + name]
             item_tags = tags + ['task']
-            self.project_tree.insert(self.clicked_element, 'end', item_id, text = name, tags = item_tags, open = open_tree)
+            
+            index = self._get_sorting_order(item_id, self.project_tree.get_children(self.clicked_element))
+            self.project_tree.insert(self.clicked_element, index, item_id, text = name, tags = item_tags, open = open_tree)
             self._adjust_width(name, item_id)
             
             sub_name = 'Dexec rules'
             sub_id = item_id + 'Dexec_Rules/'
-            sub_tag = 'dexec'
-            self.project_tree.insert(item_id, 'end', sub_id, text = sub_name, tags = tags +  [sub_tag, sub_tag + '_folder'], open = open_tree)
+            self.project_tree.insert(item_id, 'end', sub_id, text = sub_name, tags = tags +  ['dexec', 'dexec_folder'], open = open_tree)
             self._adjust_width(sub_name, sub_id)
             
             sub_name = 'Finalizing rules'
@@ -403,7 +413,8 @@ class PNPDT(object):
             return
         
         try:
-            self.project_tree.insert(self.clicked_element, 'end', item_id, text = name, tags = item_tags)
+            index = self._get_sorting_order(item_id, self.project_tree.get_children(self.clicked_element))
+            self.project_tree.insert(self.clicked_element, index, item_id, text = name, tags = item_tags)
             self._adjust_width(name, item_id)
         except Exception as e:
             del self.petri_nets[item_id]
