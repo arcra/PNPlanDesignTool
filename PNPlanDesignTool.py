@@ -617,7 +617,8 @@ class PNPDT(object):
         item_id = parent + name
         pne = self.petri_nets.pop(old_id)
         try:
-            self.project_tree.insert(parent, 'end', item_id, text = name, tags = ['petri_net'])
+            index = self._get_sorting_order(item_id, self.project_tree.get_children(parent))
+            self.project_tree.insert(parent, index, item_id, text = name, tags = ['petri_net'])
             self.project_tree.delete(old_id)
             self._adjust_width(name, item_id)
             pne.name = name
@@ -625,7 +626,8 @@ class PNPDT(object):
         except Exception as e:
             tkMessageBox.showerror('ERROR', 'Item could not be inserted in the selected node, possible duplicate name.\n\nERROR: ' + str(e))
             try:
-                self.project_tree.insert(old_parent, 'end', old_id, text = old_name, tags = ['petri_net'])
+                index = self._get_sorting_order(old_id, self.project_tree.get_children(old_parent))
+                self.project_tree.insert(old_parent, index, old_id, text = old_name, tags = ['petri_net'])
             except:
                 pass
             self.petri_nets[old_id] = pne
