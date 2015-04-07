@@ -348,7 +348,7 @@ class PNPDT(object):
         for folder in self.project_tree.get_children(item_id):
             for pn in self.project_tree.get_children(folder):
                 self.delete_petri_net(pn)
-            self.project_tree.delete(item_id)
+        self.project_tree.delete(item_id)
     
     def create_generic_pn(self):
         self.create_petri_net(PNEditorClass = RulePNEditor)
