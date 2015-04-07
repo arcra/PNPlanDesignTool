@@ -129,6 +129,7 @@ class BasicPetriNet(object):
         
         p = self.places.pop(key)
         p._references.clear()
+        p.hasTreeElement = False
         p.petri_net = None
         
         return p
@@ -165,6 +166,7 @@ class BasicPetriNet(object):
         
         t = self.transitions.pop(key)
         t._references.clear()
+        t.hasTreeElement = False
         t.petri_net = None
         
         return t
