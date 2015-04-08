@@ -133,6 +133,7 @@ class PNPDT(object):
         self.petri_net_menu = tk.Menu(self.root, tearoff = 0)
         self.petri_net_menu.add_command(label = 'Open', command = self.open_petri_net)
         self.petri_net_menu.add_command(label = 'Rename', command = self.rename_petri_net)
+        self.petri_net_menu.add_command(label = 'Duplicate', command = self.duplicate_petri_net)
         self.petri_net_menu.add_separator()
         self.petri_net_menu.add_command(label = 'Delete', command = self.delete_petri_net)
         self.petri_net_menu.add_separator()
@@ -637,6 +638,20 @@ class PNPDT(object):
             self.tab_manager.tab(pne, text = pne.name)
         except:
             pass
+    
+    def duplicate_petri_net(self):
+        original_pne = self.petri_nets[self.clicked_element]
+        #This property returns a deepcopy of the object:
+        new_pn = original_pne.petri_net
+        new_pn.name += '_copy_'
+        
+        PNEditorClass = original_pne.__class__
+        
+        new_pne = PNEditorClass(self.tab_manager, PetriNet = new_pn)
+        
+        self.clicked_element = self.project_tree.parent(self.clicked_element)
+        
+        self.create_petri_net(pne_object = new_pne)
     
     def delete_petri_net(self, item = None):
         if not item:
