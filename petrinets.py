@@ -797,7 +797,7 @@ class RulePN(BasicPetriNet):
         text = ''
         
         for p in lst[2]:
-            text = ' (' + p[0]
+            text += ' (' + p[0]
             for arg in p[1]:
                 if arg in self._main_transition._func_dict:
                     arg = self._get_func_text(self._main_transition._func_dict[arg])
