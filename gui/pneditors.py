@@ -3261,7 +3261,8 @@ class CancelationPNEditor(PlanningRulePNEditor):
                                                      'generic_transition_connections'
                                                      ]
         self._menus_dict[TaskStatusPlace.__name__] = ['task_status_operations',         # @UndefinedVariable
-                                                      'task_status_place_connections'
+                                                      'task_status_place_connections',
+                                                      'generic_place_operations'
                                                       ]
         self._menus_dict[CommandPlace.__name__] = ['generic_place_properties',          # @UndefinedVariable
                                                    'generic_place_operations'
@@ -3478,6 +3479,7 @@ class FinalizationPNEditor(CancelationPNEditor):
     def _configure_menus(self):
         CancelationPNEditor._configure_menus(self)
         
+        
         self._menus_options_sets_dict['task_status_operations'].append(
                                                              ('Make Generic Task Status', self._make_generic_task_status)
                                                             )
@@ -3488,6 +3490,10 @@ class FinalizationPNEditor(CancelationPNEditor):
                                                      'generic_transition_properties',
                                                      'generic_transition_connections'
                                                      ]
+        
+        self._menus_dict[TaskStatusPlace.__name__] = ['task_status_operations',         # @UndefinedVariable
+                                                      'task_status_place_connections'
+                                                      ]
     
     def _make_generic_task_status(self):
         self._change_task_status('?')
