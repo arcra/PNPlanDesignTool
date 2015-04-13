@@ -492,7 +492,7 @@ class PNPDT(object):
         
         tmp_dir = tempfile.mkdtemp()
         
-        task_name = zip_file.read('task_name.txt')
+        task_name = zip_file.read('task_name.txt').strip()
         self.create_task(task_name, open_tree = False)
         task_id = self.clicked_element + task_name + '/'
         
@@ -622,7 +622,7 @@ class PNPDT(object):
             self.project_tree.insert(parent, index, item_id, text = name, tags = ['petri_net'])
             self.project_tree.delete(old_id)
             self._adjust_width(name, item_id)
-            pne.name = name
+            pne._petrin_net.name = name
             self.petri_nets[item_id] = pne
         except Exception as e:
             tkMessageBox.showerror('ERROR', 'Item could not be inserted in the selected node, possible duplicate name.\n\nERROR: ' + str(e))
@@ -641,7 +641,7 @@ class PNPDT(object):
     
     def duplicate_petri_net(self):
         original_pne = self.petri_nets[self.clicked_element]
-        #This property returns a deepcopy of the object:
+        #This property (pne.petri_net) returns a deepcopy of the object:
         new_pn = original_pne.petri_net
         new_pn.name += '_copy_'
         
