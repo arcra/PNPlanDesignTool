@@ -622,7 +622,7 @@ class PNPDT(object):
             self.project_tree.insert(parent, index, item_id, text = name, tags = ['petri_net'])
             self.project_tree.delete(old_id)
             self._adjust_width(name, item_id)
-            pne._petrin_net.name = name
+            pne._petri_net.name = name
             self.petri_nets[item_id] = pne
         except Exception as e:
             tkMessageBox.showerror('ERROR', 'Item could not be inserted in the selected node, possible duplicate name.\n\nERROR: ' + str(e))
