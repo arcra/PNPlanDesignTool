@@ -751,10 +751,6 @@ class BasicPNEditor(Tkinter.Canvas):
     def name(self):
         return self._petri_net.name
     
-    @name.setter
-    def name(self, val):
-        self._petri_net.name = val
-    
     def disable(self):
         self._state = 'disabled'
         self.config(background = 'gray')
