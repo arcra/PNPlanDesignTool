@@ -98,6 +98,8 @@ class PNPDT(object):
         
         menubar.add_cascade(label = 'File', menu = file_menu)
         
+        menubar.add_command(label="Get CLIPS Code...", command = self.get_clips_code)
+        
         self.root.config(menu = menubar)
         
         self.popped_up_menu = None
@@ -781,7 +783,7 @@ class PNPDT(object):
         return True
     
     #######################################################
-    #                FILE MENU ACTIONS
+    #                MENU ACTIONS
     #######################################################
     
     def _check_edited(self):
@@ -923,6 +925,126 @@ class PNPDT(object):
                 return
         
         self.root.destroy()
+        
+    def get_clips_code(self):
+        dest_dir = tkFileDialog.askdirectory(
+                                              title = 'Save CLIPS code to...',
+                                              initialdir = os.path.dirname(self.file_path) if self.file_path is not None else os.path.expanduser('~/Desktop')
+                                            )
+        
+        if not dest_dir:
+            return
+        
+        tasks = self.project_tree.get_children('Tasks/')
+        
+        task_names = {}
+        task_names_set = set()
+        
+        for t in tasks:
+            basename = os.path.basename(t[:-1])
+            par = basename.find('(')
+            if par >= 0:
+                basename = basename[:par]
+            task_names[t] = basename
+            task_names_set.add(basename)
+        
+        
+        for t in tasks:
+            folder = task_names[t]
+            path = os.path.join(dest_dir, folder)
+            filename_prefix = os.path.join(path, folder)
+            
+            try:
+                os.mkdir(path)
+            except Exception as e:
+                print 'An ERROR ocurred when creating the folder: ' + path + '.\n\n' + str(e)
+                return
+            
+            try:
+                clips_file = open(filename_prefix + '.clp', 'w')
+                clips_file.write('################################\n')
+                clips_file.write('#         DEXEC RULES\n')
+                clips_file.write('################################\n\n')
+                
+                for item in self.project_tree.get_children(t + 'Dexec_Rules/'):
+                    pne = self.petri_nets[item]
+                    pn = pne._petri_net
+                    clips_file.write(pn.get_clips_code())
+                    clips_file.write('\n\n')
+                
+                clips_file.write('################################\n')
+                clips_file.write('#      FINALIZING RULES\n')
+                clips_file.write('################################\n\n')
+                
+                for item in self.project_tree.get_children(t + 'Finalizing_Rules/'):
+                    pne = self.petri_nets[item]
+                    pn = pne._petri_net
+                    clips_file.write(pn.get_clips_code())
+                    clips_file.write('\n\n')
+                
+                clips_file.write('################################\n')
+                clips_file.write('#      CANCELING RULES\n')
+                clips_file.write('################################\n\n')
+                
+                for item in self.project_tree.get_children(t + 'Canceling_Rules/'):
+                    pne = self.petri_nets[item]
+                    pn = pne._petri_net
+                    clips_file.write(pn.get_clips_code(True))
+                    clips_file.write('\n\n')
+                
+                clips_file.close()
+                
+            except Exception as e:
+                print 'An ERROR ocurred when writing CLIPS code in bulk.\n\n' + str(e)
+                clips_file.close()
+                return
+            
+            try:
+                
+                lst_file = open(filename_prefix + '.lst', 'w')
+                lst_file.write(folder + '.clp\n')
+                
+                for item in self.project_tree.get_children(t + 'Dexec_Rules/'):
+                    pne = self.petri_nets[item]
+                    pn = pne._petri_net
+                    dependency_tasks = pn.get_dependency_tasks()
+                    while dependency_tasks:
+                        dt = dependency_tasks.pop()
+                        if dt in task_names_set:
+                            lst_file.write('../' + dt + '/' + dt + '.lst\n')
+                        else:
+                            print "WARNING: Task '" + dt + "' is missing."
+                
+                for item in self.project_tree.get_children(t + 'Finalizing_Rules/'):
+                    pne = self.petri_nets[item]
+                    pn = pne._petri_net
+                    dependency_tasks = pn.get_dependency_tasks()
+                    while dependency_tasks:
+                        dt = dependency_tasks.pop()
+                        if dt in task_names_set:
+                            lst_file.write('../' + dt + '/' + dt + '.lst\n')
+                        else:
+                            print "WARNING: Task '" + dt + "' is missing."
+                
+                for item in self.project_tree.get_children(t + 'Canceling_Rules/'):
+                    pne = self.petri_nets[item]
+                    pn = pne._petri_net
+                    dependency_tasks = pn.get_dependency_tasks()
+                    while dependency_tasks:
+                        dt = dependency_tasks.pop()
+                        if dt in task_names_set:
+                            lst_file.write('../' + dt + '/' + dt + '.lst\n')
+                        else:
+                            print "WARNING: Task '" + dt + "' is missing."
+                
+                lst_file.close()
+                
+            except Exception as e:
+                print 'An ERROR ocurred when writing the .lst source file.\n\n' + str(e)
+                lst_file.close()
+                return
+            
+        
 
 if __name__ == '__main__':
     w = PNPDT()

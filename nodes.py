@@ -292,9 +292,9 @@ class BaseFactPlace(Place):
     
     __metaclass__ = abc.ABCMeta
     
-    REGEX = re.compile(r'(?P<name>[a-zA-Z][a-zA-Z0-9_]*)\s*(?P<parenthesis>(\(\s*(([-]?[0-9]+(\.[0-9]+)?)|(\$?\?)|((\$?\?)?[a-zA-Z][a-zA-Z0-9_]*)|("([^\\"]|\\.)*"))(\s*,\s*(([-]?[0-9]+(\.[0-9]+)?)|(\$?\?)|((\$?\?)?[a-zA-Z][a-zA-Z0-9_]*)|("([^\\"]|\\.)*")))*\s*\))?)')
+    REGEX = re.compile(r'(?P<name>[a-zA-Z][a-zA-Z0-9_-]*)\s*(?P<parenthesis>(\(\s*(([-]?[0-9]+(\.[0-9]+)?)|(\$?\?)|((\$?\?)?[a-zA-Z][a-zA-Z0-9_-]*)|("([^\\"]|\\.)*"))(\s*,\s*(([-]?[0-9]+(\.[0-9]+)?)|(\$?\?)|((\$?\?)?[a-zA-Z][a-zA-Z0-9_-]*)|("([^\\"]|\\.)*")))*\s*\))?)')
     PARAMS_REGEX = re.compile(r'[^\s,][^\s,]*')
-    VARS_REGEX = re.compile(r'\?[a-zA-Z][a-zA-Z0-9_]*')
+    VARS_REGEX = re.compile(r'\?[a-zA-Z][a-zA-Z0-9_-]*')
     
     def _get_vars(self):
         m = self.REGEX.match(self.name)
@@ -347,46 +347,46 @@ class StructuredFactPlace(FactPlace):
     FILL_COLOR = '#CC0099'
     OUTLINE_COLOR = '#AA0077'
     PREFIX = 'sfact'
-    STRUTURED_PARAMS_REGEX = re.compile(r'(?P<name>[a-zA-Z][a-zA-Z0-9_]*)\s*:\s*(' + 
-                                    '(?P<single>(([-]?[0-9]+(\.[0-9]+)?)|((\$?\?)?[a-zA-Z][a-zA-Z0-9_]*)|("([^\\"]|\\.)*")))|' + 
+    STRUTURED_PARAMS_REGEX = re.compile(r'(?P<name>[a-zA-Z][a-zA-Z0-9_-]*)\s*:\s*(' + 
+                                    '(?P<single>(([-]?[0-9]+(\.[0-9]+)?)|((\$?\?)?[a-zA-Z][a-zA-Z0-9_-]*)|("([^\\"]|\\.)*")))|' + 
                                     '(?P<multi>\(' +
-                                        '((\$?\?)|([-]?[0-9]+(\.[0-9]+)?)|((\$?\?)?[a-zA-Z][a-zA-Z0-9_]*)|("([^\\"]|\\.)*"))' +  
-                                        '(\s*,\s*((\$?\?)|([-]?[0-9]+(\.[0-9]+)?)|((\$?\?)?[a-zA-Z][a-zA-Z0-9_]*)|("([^\\"]|\\.)*")))*' +  
+                                        '((\$?\?)|([-]?[0-9]+(\.[0-9]+)?)|((\$?\?)?[a-zA-Z][a-zA-Z0-9_-]*)|("([^\\"]|\\.)*"))' +  
+                                        '(\s*,\s*((\$?\?)|([-]?[0-9]+(\.[0-9]+)?)|((\$?\?)?[a-zA-Z][a-zA-Z0-9_-]*)|("([^\\"]|\\.)*")))*' +  
                                     '\))' + 
                                 ')')
     #I've created a MONSTER!!!!
     
     #name of deftemplate
-    REGEX = re.compile(r'(?P<name>[a-zA-Z][a-zA-Z0-9_]*)\s*(?P<parenthesis>(\(' +
+    REGEX = re.compile(r'(?P<name>[a-zA-Z][a-zA-Z0-9_-]*)\s*(?P<parenthesis>(\(' +
                        # name of field / slot
-                       '\s*[a-zA-Z][a-zA-Z0-9_]*\s*:' +
+                       '\s*[a-zA-Z][a-zA-Z0-9_-]*\s*:' +
                        # value of field / slot
                        '\s*(' + 
                             # number, variable (multi or single), constant or string
-                            '(([-]?[0-9]+(\.[0-9]+)?)|((\$?\?)?[a-zA-Z][a-zA-Z0-9_]*)|("([^\\"]|\\.)*"))|' +
+                            '(([-]?[0-9]+(\.[0-9]+)?)|((\$?\?)?[a-zA-Z][a-zA-Z0-9_-]*)|("([^\\"]|\\.)*"))|' +
                             # nested parenthesis 
-                            '\(' +
-                                # number, variable (multi or single), constant or string
-                                '((\$?\?)|([-]?[0-9]+(\.[0-9]+)?)|((\$?\?)?[a-zA-Z][a-zA-Z0-9_]*)|("([^\\"]|\\.)*"))' +
+                            '(\(' +
+                                # wildcard, number, variable (multi or single), constant or string
+                                '((\$?\?)|([-]?[0-9]+(\.[0-9]+)?)|((\$?\?)?[a-zA-Z][a-zA-Z0-9_-]*)|("([^\\"]|\\.)*"))' +
                                 # coma and some other param
-                                '(\s*,\s*((\$?\?)|([-]?[0-9]+(\.[0-9]+)?)|((\$?\?)?[a-zA-Z][a-zA-Z0-9_]*)|("([^\\"]|\\.)*")))*' +  
-                            '\)' + 
+                                '(\s*,\s*((\$?\?)|([-]?[0-9]+(\.[0-9]+)?)|((\$?\?)?[a-zA-Z][a-zA-Z0-9_-]*)|("([^\\"]|\\.)*")))*' +  
+                            '\))' + 
                         ')' + 
                         # name of field / slot
-                        '(\s*,\s*[a-zA-Z][a-zA-Z0-9_]*\s*:' +
+                        '(\s*,\s*[a-zA-Z][a-zA-Z0-9_-]*\s*:' +
                         # value of field / slot 
                        '\s*(' +
                             # number, variable (multi or single), constant or string 
-                            '(([-]?[0-9]+(\.[0-9]+)?)|((\$?\?)?[a-zA-Z][a-zA-Z0-9_]*)|("([^\\"]|\\.)*"))|' +
+                            '(([-]?[0-9]+(\.[0-9]+)?)|((\$?\?)?[a-zA-Z][a-zA-Z0-9_-]*)|("([^\\"]|\\.)*"))|' +
                             # nested parenthesis  
-                            '\(' +
+                            '(\(' +
                                 # number, variable (multi or single), constant or string
-                                '((\$?\?)|([-]?[0-9]+(\.[0-9]+)?)|((\$?\?)?[a-zA-Z][a-zA-Z0-9_]*)|("([^\\"]|\\.)*"))' +  
+                                '((\$?\?)|([-]?[0-9]+(\.[0-9]+)?)|((\$?\?)?[a-zA-Z][a-zA-Z0-9_-]*)|("([^\\"]|\\.)*"))' +  
                                 # coma and some other param
-                                '(\s*,\s*((\$?\?)|([-]?[0-9]+(\.[0-9]+)?)|((\$?\?)?[a-zA-Z][a-zA-Z0-9_]*)|("([^\\"]|\\.)*")))*' +  
-                            '\)' + 
+                                '(\s*,\s*((\$?\?)|([-]?[0-9]+(\.[0-9]+)?)|((\$?\?)?[a-zA-Z][a-zA-Z0-9_-]*)|("([^\\"]|\\.)*")))*' +  
+                            '\))' + 
                         '))*' + 
-                        '\s*\))?)')
+                        '\s*\)))?')
     
     def _get_description(self):
         
@@ -439,7 +439,7 @@ class CommandPlace(BaseFactPlace):
     FILL_COLOR = '#99FF66'
     OUTLINE_COLOR = '#77DD44'
     PREFIX = 'cmd'
-    REGEX = re.compile(r'(?P<name>[a-zA-Z][a-zA-Z0-9_]*)\s*(?P<parenthesis>(\(\s*((\?[a-zA-Z][a-zA-Z0-9_]*)|("([^\\"]|\\.)*"))\s*,\s*(\??[a-zA-Z][a-zA-Z0-9_]*)(\s*,\s*((\?[a-zA-Z][a-zA-Z0-9_]*)|([0-9]+))){0,2}\s*\)))')
+    REGEX = re.compile(r'(?P<name>[a-zA-Z][a-zA-Z0-9_]*)\s*(?P<parenthesis>(\(\s*((\?[a-zA-Z][a-zA-Z0-9_-]*)|("([^\\"]|\\.)*"))\s*,\s*(\??[a-zA-Z][a-zA-Z0-9_-]*)(\s*,\s*((\?[a-zA-Z][a-zA-Z0-9_-]*)|([0-9]+))){0,2}\s*\)))')
     
     @classmethod
     def _get_new_node_name(cls):
@@ -513,8 +513,8 @@ class FunctionPlace(BaseFactPlace):
     FILL_COLOR = '#66AA00'
     OUTLINE_COLOR = '#447700'
     PREFIX = 'fnc'
-    #REGEX = re.compile(r'fnc\s*\(\s*(?P<func>[^\s,]+)(?P<args>(\s*,\s*(([-]?[0-9]+(\.[0-9]+)?)|(\??[a-zA-Z][a-zA-Z0-9_]*)|("[^"]*")))+)\s*,\s*(?P<result>(\?[a-zA-Z][a-zA-Z0-9_]*))\s*\)')
-    REGEX = re.compile(r'fnc\s*\(\s*(?P<func>[^\s,]+)(?P<args>(\s*,\s*(([-]?[0-9]+(\.[0-9]+)?)|(\??[a-zA-Z][a-zA-Z0-9_]*)|("([^\\"]|\\.)*")))+)\s*,\s*(?P<result>(\?[a-zA-Z][a-zA-Z0-9_]*))\s*\)')
+    #REGEX = re.compile(r'fnc\s*\(\s*(?P<func>[^\s,]+)(?P<args>(\s*,\s*(([-]?[0-9]+(\.[0-9]+)?)|(\??[a-zA-Z][a-zA-Z0-9_-]*)|("[^"]*")))+)\s*,\s*(?P<result>(\?[a-zA-Z][a-zA-Z0-9_-]*))\s*\)')
+    REGEX = re.compile(r'fnc\s*\(\s*(?P<func>[^\s,]+)(?P<args>(\s*,\s*(([-]?[0-9]+(\.[0-9]+)?)|(\??[a-zA-Z][a-zA-Z0-9_-]*)|("([^\\"]|\\.)*")))+)\s*,\s*(?P<result>(\?[a-zA-Z][a-zA-Z0-9_-]*))\s*\)')
     
     @classmethod
     def _get_new_node_name(cls):
@@ -554,8 +554,8 @@ class FunctionCallPlace(BaseFactPlace):
     FILL_COLOR = '#EEEE00'
     OUTLINE_COLOR = '#AAAA00'
     PREFIX = 'fncCall'
-    #REGEX = re.compile(r'fncCall\s*\(\s*(?P<func>[^\s,\?]+)(?P<args>(\s*,\s*(([-]?[0-9]+(\.[0-9]+)?)|(\??[a-zA-Z][a-zA-Z0-9_]*)|("[^"]*")))+)\s*\)')
-    REGEX = re.compile(r'(?P<func>[a-zA-Z][a-zA-Z0-9_-]+)\s*(\(\s*(?P<args>(([-]?[0-9]+(\.[0-9]+)?)|(\??[a-zA-Z][a-zA-Z0-9_]*)|("([^\\"]|\\.)*"))(\s*,\s*(([-]?[0-9]+(\.[0-9]+)?)|(\??[a-zA-Z][a-zA-Z0-9_]*)|("([^\\"]|\\.)*")))*)\s*\))?')
+    #REGEX = re.compile(r'fncCall\s*\(\s*(?P<func>[^\s,\?]+)(?P<args>(\s*,\s*(([-]?[0-9]+(\.[0-9]+)?)|(\??[a-zA-Z][a-zA-Z0-9_-]*)|("[^"]*")))+)\s*\)')
+    REGEX = re.compile(r'(?P<func>[a-zA-Z][a-zA-Z0-9_-]+)\s*(\(\s*(?P<args>(([-]?[0-9]+(\.[0-9]+)?)|(\??[a-zA-Z][a-zA-Z0-9_-]*)|("([^\\"]|\\.)*"))(\s*,\s*(([-]?[0-9]+(\.[0-9]+)?)|(\??[a-zA-Z][a-zA-Z0-9_-]*)|("([^\\"]|\\.)*")))*)\s*\))?')
     
     @classmethod
     def _get_new_node_name(cls):
@@ -598,7 +598,7 @@ class ComparisonPlace(BaseFactPlace):
     OUTLINE_COLOR = '#AA0000'
     PREFIX = 'cmp'
     #NOTE: if regex (list of operators) changes, change exception messages.
-    REGEX = re.compile(r'cmp\s*\(\s*(?P<operator>((>)|(>=)|(<)|(<=)|(=)|(<>)|(eq)|(neq)))\s*,\s*(?P<op1>(([-]?[0-9]+(\.[0-9]+)?)|(\??[a-zA-Z][a-zA-Z0-9_]*)|("([^\\"]|\\.)*")))\s*,\s*(?P<op2>(([-]?[0-9]+(\.[0-9]+)?)|(\??[a-zA-Z][a-zA-Z0-9_]*)|("([^\\"]|\\.)*")))\s*\)')
+    REGEX = re.compile(r'cmp\s*\(\s*(?P<operator>((>)|(>=)|(<)|(<=)|(=)|(<>)|(eq)|(neq)))\s*,\s*(?P<op1>(([-]?[0-9]+(\.[0-9]+)?)|(\??[a-zA-Z][a-zA-Z0-9_-]*)|("([^\\"]|\\.)*")))\s*,\s*(?P<op2>(([-]?[0-9]+(\.[0-9]+)?)|(\??[a-zA-Z][a-zA-Z0-9_-]*)|("([^\\"]|\\.)*")))\s*\)')
     
     @classmethod
     def _get_new_node_name(cls):
@@ -650,16 +650,16 @@ class OrPlace(BaseFactPlace):
         if val != 'OR':
             raise Exception('An OR Place must be named "OR".')
     
-    def _get_description(self, bound_vars = None):
+    def _get_description(self, prev_transition):
         
         incoming_arcs = self._incoming_arcs.values()
         params = []
         
         for arc in incoming_arcs:
             if arc.weight == 0:
-                params.append(['not', arc.source._get_description(bound_vars)])
+                params.append(['not', arc.source._get_description(prev_transition)])
             else:
-                params.append(arc.source._get_description(bound_vars))
+                params.append(arc.source._get_description(prev_transition))
         
         return ['or', params]
     
@@ -694,10 +694,10 @@ class NandPlace(BaseFactPlace):
         if val != 'NAND':
             raise Exception('A NAND Place must be named "NAND".')
     
-    def _get_description(self, bound_vars):
+    def _get_description(self, prev_transition):
         
         #NAND places should only have one transition connected to them.
-        return self._incoming_arcs.values()[0].source._get_description(bound_vars)
+        return self._incoming_arcs.values()[0].source._get_description(prev_transition)
     
     def _get_bound_vars(self):
         return set()
@@ -960,10 +960,12 @@ class RuleTransition(BaseRuleTransition):
     
     def _get_preconditions(self, is_cancelation = False):
         
+        self._func_vars = set()
         self._bound_vars = set()
         self._unbound_vars = set()
         
         incoming_arcs = self._incoming_arcs.values()
+        or_arcs = []
         not_arcs = []
         
         cancelation_precondition = ['not', ['cancel_active_tasks']]
@@ -977,6 +979,23 @@ class RuleTransition(BaseRuleTransition):
         initial = None
         edited = False
         
+        # GET FUNCTION NAMES
+        while incoming_arcs:
+            
+            arc = incoming_arcs.pop(0)
+            
+            if arc.source.__class__ is not FunctionPlace:
+                continue
+            
+            func_vars = arc.source._get_bound_vars()
+            # Check if result variable was already used in another function.
+            if not func_vars - self._func_vars:
+                raise Exception('A function with the result variable name "' + func_vars.pop() + '" already exists!')
+            self._func_vars |= func_vars
+        
+        incoming_arcs = self._incoming_arcs.values()
+        
+        # PROCESS "POSITIVE" NODES
         while incoming_arcs:
             
             arc = incoming_arcs.pop(0)
@@ -988,44 +1007,64 @@ class RuleTransition(BaseRuleTransition):
             unbound_vars = None
             
             if arc.source.__class__ is TaskPlace:
-                unbound_vars = (arc.source._get_unbound_vars() - self._bound_vars)
+                node_bound_vars = arc.source._get_bound_vars()
+                node_unbound_vars = arc.source._get_unbound_vars()
+                bound_vars = node_bound_vars - (self._func_vars - self._bound_vars)
+                unbound_vars = (node_unbound_vars | (node_bound_vars - bound_vars))  - self._bound_vars
                 if not unbound_vars:
-                    first_arcs.insert(0, arc.source._get_description())
+                    desc = arc.source._get_description()
+                    desc = [desc[0]] + [self._func_dict] + desc[1:]
+                    first_arcs.insert(0, desc)
                     edited = True
-                    self._bound_vars |= arc.source._get_bound_vars()
+                    self._bound_vars |= bound_vars
             elif arc.source.__class__ is TaskStatusPlace:
-                unbound_vars = (arc.source._get_unbound_vars() - self._bound_vars)
+                node_bound_vars = arc.source._get_bound_vars()
+                node_unbound_vars = arc.source._get_unbound_vars()
+                bound_vars = node_bound_vars - (self._func_vars - self._bound_vars)
+                unbound_vars = (node_unbound_vars | (node_bound_vars - bound_vars))  - self._bound_vars
                 if not unbound_vars:
+                    desc = arc.source._get_description()
+                    desc = [desc[0]] + [self._func_dict] + desc[1:]
                     if repr(arc.source) not in self._outgoing_arcs:
-                        first_arcs.append(['delete', arc.source._get_description()])
+                        first_arcs.append(['delete', desc])
                     else:
-                        first_arcs.append(arc.source._get_description())
+                        first_arcs.append(desc)
                     edited = True
                     task_status = True
-                    self._bound_vars |= arc.source._get_bound_vars()
+                    self._bound_vars |= bound_vars
             elif arc.source.__class__ in [FactPlace, StructuredFactPlace]:
-                unbound_vars = (arc.source._get_unbound_vars() - self._bound_vars)
+                node_bound_vars = arc.source._get_bound_vars()
+                node_unbound_vars = arc.source._get_unbound_vars()
+                bound_vars = node_bound_vars - (self._func_vars - self._bound_vars)
+                unbound_vars = (node_unbound_vars | (node_bound_vars - bound_vars))  - self._bound_vars
                 if not unbound_vars:
+                    desc = arc.source._get_description()
+                    desc = [desc[0]] + [self._func_dict] + desc[1:]
                     if repr(arc.source) not in self._outgoing_arcs:
-                        preconditions.append(['delete', arc.source._get_description()])
+                        preconditions.append(['delete', desc])
                     else:
-                        preconditions.append(arc.source._get_description())
+                        preconditions.append(desc)
                     edited = True
-                    self._bound_vars |= arc.source._get_bound_vars()
+                    self._bound_vars |= bound_vars
             elif arc.source.__class__ is OrPlace:
-                unbound_vars = (arc.source._get_unbound_vars() - self._bound_vars)
+                node_bound_vars = arc.source._get_bound_vars()
+                node_unbound_vars = arc.source._get_unbound_vars()
+                bound_vars = node_bound_vars - (self._func_vars - self._bound_vars)
+                unbound_vars = (node_unbound_vars | (node_bound_vars - bound_vars))  - self._bound_vars
                 if not unbound_vars:
-                    preconditions.append(arc.source._get_description(self._bound_vars))
+                    or_arcs.append(arc)
                     edited = True
-                    self._bound_vars |= arc.source._get_bound_vars()
+                    self._bound_vars |= bound_vars
             elif arc.source.__class__ is ComparisonPlace:
-                unbound_vars = (arc.source._get_unbound_vars() - self._bound_vars)
+                unbound_vars = arc.source._get_unbound_vars() - self._bound_vars
                 if not unbound_vars:
-                    preconditions.append(arc.source._get_description())
+                    desc = arc.source._get_description()
+                    desc = [desc[0]] + [self._func_dict] + desc[1:]
+                    preconditions.append(desc)
                     edited = True
                     self._bound_vars |= arc.source._get_bound_vars()
             elif arc.source.__class__ is FunctionPlace:
-                unbound_vars = (arc.source._get_unbound_vars() - self._bound_vars)
+                unbound_vars = arc.source._get_unbound_vars() - self._bound_vars
                 if not unbound_vars:
                     key, val = arc.source._get_func_substitution()
                     self._func_dict[key] = val
@@ -1052,15 +1091,22 @@ class RuleTransition(BaseRuleTransition):
                         raise Exception('The following unbound variables were found: ' + ', '.join(self._unbound_vars) + '.')
         
         if not task_status:
-            first_arcs.append(['not', ['task_status', '?']])
+            first_arcs.append(['not', ['task_status', {}, '?']])
         
+        # PROCESS "OR" NODES RECURSIVELY (AFTER ALL FUNCTION PLACES WERE PROCESSED)
+        for arc in or_arcs:
+            preconditions.append(arc.source._get_description(self))
+        
+        # PROCESS "NEGATIVE" ARCS
         while not_arcs:
             arc = not_arcs.pop(0)
             
             if arc.source.__class__ in [FactPlace, StructuredFactPlace, ComparisonPlace]:
-                preconditions.append(['not', arc.source._get_description()])
+                desc = arc.source._get_description()
+                desc = [desc[0]] + [self._func_dict] + desc[1:]
+                preconditions.append(['not', desc])
             elif arc.source.__class__ in [OrPlace, NandPlace]:
-                preconditions.append(['not', arc.source._get_description(self._bound_vars)])
+                preconditions.append(['not', arc.source._get_description(self)])
             else:
                 print 'Place was not parsed: ' + str(arc.source)
         
@@ -1079,12 +1125,15 @@ class AndTransition(BaseRuleTransition):
                                     StructuredFactPlace, TaskPlace, TaskStatusPlace]:
             raise Exception('AND transitions can only connect to an OR place, a NAND place, or a precondition Fact, Task or TaskStatus places.')
     
-    def _get_description(self, bound_vars):
+    def _get_description(self, prev_transition):
         
-        self._bound_vars = set(bound_vars)
-        self._unbound_vars = set()
+        self._func_vars = set(prev_transition._func_vars)
+        self._bound_vars = set(prev_transition._bound_vars)
+        
+        self._func_dict = copy.copy(prev_transition._func_dict)
         
         incoming_arcs = self._incoming_arcs.values()
+        or_arcs = []
         not_arcs = []
         
         preconditions = []
@@ -1092,6 +1141,23 @@ class AndTransition(BaseRuleTransition):
         initial = None
         edited = False
         
+        # GET FUNCTION NAMES
+        while incoming_arcs:
+            
+            arc = incoming_arcs.pop(0)
+            
+            if arc.source.__class__ is not FunctionPlace:
+                continue
+            
+            func_vars = arc.source._get_bound_vars()
+            # Check if result variable was already used in another function.
+            if not func_vars - self._func_vars:
+                raise Exception('A function with the result variable name "' + func_vars.pop() + '" already exists!')
+            self._func_vars |= func_vars
+        
+        incoming_arcs = self._incoming_arcs.values()
+        
+        # PROCESS "POSITIVE" NODES
         while incoming_arcs:
             
             arc = incoming_arcs.pop(0)
@@ -1103,25 +1169,37 @@ class AndTransition(BaseRuleTransition):
             unbound_vars = None
             
             if arc.source.__class__ in [FactPlace, StructuredFactPlace]:
-                unbound_vars = (arc.source._get_unbound_vars() - self._bound_vars)
+                node_bound_vars = arc.source._get_bound_vars()
+                node_unbound_vars = arc.source._get_unbound_vars()
+                bound_vars = node_bound_vars - (self._func_vars - self._bound_vars)
+                unbound_vars = (node_unbound_vars | (node_bound_vars - bound_vars))  - self._bound_vars
                 if not unbound_vars:
-                    preconditions.append(arc.source._get_description())
+                    desc = arc.source._get_description()
+                    desc = [desc[0]] + [self._func_dict] + desc[1:]
+                    preconditions.append(desc)
                     edited = True
-                    self._bound_vars |= arc.source._get_bound_vars()
+                    self._bound_vars |= bound_vars
             elif arc.source.__class__ is OrPlace:
-                unbound_vars = (arc.source._get_unbound_vars() - self._bound_vars)
+                node_bound_vars = arc.source._get_bound_vars()
+                node_unbound_vars = arc.source._get_unbound_vars()
+                bound_vars = node_bound_vars - (self._func_vars - self._bound_vars)
+                unbound_vars = (node_unbound_vars | (node_bound_vars - bound_vars))  - self._bound_vars
                 if not unbound_vars:
-                    preconditions.append(arc.source._get_description(self._bound_vars))
+                    #preconditions.append(arc.source._get_description(self))
+                    or_arcs.append(arc)
                     edited = True
-                    self._bound_vars |= arc.source._get_bound_vars()
+                    self._bound_vars |= bound_vars
             elif arc.source.__class__ is ComparisonPlace:
                 unbound_vars = (arc.source._get_unbound_vars() - self._bound_vars)
                 if not unbound_vars:
-                    preconditions.append(arc.source._get_description())
+                    desc = arc.source._get_description()
+                    desc = [desc[0]] + [self._func_dict] + desc[1:]
+                    preconditions.append(desc)
                     edited = True
                     self._bound_vars |= arc.source._get_bound_vars()
             elif arc.source.__class__ is FunctionPlace:
-                unbound_vars = (arc.source._get_unbound_vars() - self._bound_vars)
+                
+                unbound_vars = arc.source._get_unbound_vars() - self._bound_vars
                 if not unbound_vars:
                     key, val = arc.source._get_func_substitution()
                     self._func_dict[key] = val
@@ -1134,7 +1212,6 @@ class AndTransition(BaseRuleTransition):
             if unbound_vars:
                 # Enqueue to process later
                 incoming_arcs.append(arc)
-                self._unbound_vars |= unbound_vars
                 
                 #Marc initial arc, if this arc is reached again and no other place was processed:
                 #then this place cannot be processed, i. e. it has unbound variables.
@@ -1146,12 +1223,21 @@ class AndTransition(BaseRuleTransition):
                     else:
                         raise Exception('Something wrong happened. Unbound variables found while getting AND preconditions.')
         
+        # PROCESS OR NODES RECURSIVELY (AFTER ALL FUNCTION PLACES WERE PROCESSED)
+        for arc in or_arcs:
+            preconditions.append(arc.source._get_description(self))
+        
+        # PROCESS "NEGATIVE" NODES
         for arc in not_arcs:
             
             if arc.source.__class__ in [FactPlace, StructuredFactPlace, ComparisonPlace]:
-                preconditions.append(['not', arc.source._get_description()])
+                desc = arc.source._get_description()
+                desc = [desc[0]] + [self._func_dict] + desc[1:]
+                preconditions.append(['not', desc])
             elif arc.source.__class__ in [OrPlace, NandPlace]:
-                preconditions.append(['not', arc.source._get_description(self._bound_vars)])
+                desc = arc.source._get_description(self)
+                #desc = [desc[0]] + [self._func_dict] + desc[1:]
+                preconditions.append(['not', desc])
             else:
                 print 'Place was not parsed: ' + str(arc.source)
         
@@ -1163,7 +1249,6 @@ class AndTransition(BaseRuleTransition):
     def _get_bound_vars(self):
         
         self._bound_vars = set()
-        self._unbound_vars = set()
         
         incoming_arcs = self._incoming_arcs.values()
         
@@ -1182,21 +1267,21 @@ class AndTransition(BaseRuleTransition):
     def _get_unbound_vars(self):
         
         self._bound_vars = self._get_bound_vars()
-        self._unbound_vars = set()
+        unbound_vars = set()
         
         incoming_arcs = self._incoming_arcs.values()
         
         for arc in incoming_arcs:
             
-            if arc.weight == 0:
+            if arc.weight == 0 or arc.source.__class__ not in [ComparisonPlace, FunctionPlace]:
                 continue
             
             if arc.source.__class__ is ComparisonPlace:
-                self._unbound_vars |= (arc.source._get_unbound_vars() - self._bound_vars)
-            elif arc.source.__class__ is FunctionPlace:
-                self._unbound_vars |= (arc.source._get_unbound_vars() - self._bound_vars)
+                unbound_vars |= (arc.source._get_unbound_vars() - self._bound_vars)
+            else:
+                unbound_vars |= (arc.source._get_unbound_vars() - self._bound_vars)
         
-        return self._unbound_vars
+        return unbound_vars
 
 class SequenceTransition(BaseRuleTransition):
     

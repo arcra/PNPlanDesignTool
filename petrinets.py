@@ -568,7 +568,7 @@ class RulePN(BasicPetriNet):
                                         'or' : self._handle_or,
                                         'and' : self._handle_and,
                                         'not' : self._handle_not,
-                                        'task_status' : lambda x: '(task_status ?pnpdt_task__ ' + x[1] + ')',
+                                        'task_status' : lambda x: '(task_status ?pnpdt_task__ ' + x[2] + ')',
                                         'active_task' : lambda x: '(active_task ?pnpdt_task__)',
                                         'cancel_active_tasks' : lambda x: '(cancel_active_tasks)'
                                     }
@@ -624,6 +624,22 @@ class RulePN(BasicPetriNet):
         
         return super(RulePN, self).add_arc(source, target, weight, _treeElement)
     
+    def get_dependency_tasks(self):
+        
+        dependencies = set()
+        
+        for p in self.places.values():
+            if p.__class__ is not TaskPlace or p.name == self.task:
+                continue
+            name = p.name
+            par = name.find('(')
+            if par >= 0:
+                name = name[:par]
+            dependencies.add(name)
+            
+        return dependencies
+                    
+    
     def get_clips_code(self, is_cancelation = False):
         
         '''
@@ -644,8 +660,11 @@ class RulePN(BasicPetriNet):
         self._deleted_fact_count = 0
         self._to_delete = []
         
-        preconditions = self._main_transition._get_preconditions(is_cancelation)
-        facts, tasks, functions = self._get_effects()
+        try:
+            preconditions = self._main_transition._get_preconditions(is_cancelation)
+            facts, tasks, functions = self._get_effects()
+        except Exception as e:
+            raise Exception(str(e) + '\nError occurred in PN: ' + self.task + ' - ' + self.name + '.')
         
         task = self.task
         pos = self.task.find('(')
@@ -683,12 +702,12 @@ class RulePN(BasicPetriNet):
         
         return text
     
-    def _get_func_text(self, lst):
+    def _get_func_text(self, func_dict, lst):
         text = '(' + lst[0]
         
         for arg in lst[1:]:
-            if arg in self._main_transition._func_dict:
-                arg = self._get_func_text(self._main_transition._func_dict[arg])
+            if arg in func_dict:
+                arg = self._get_func_text(func_dict, func_dict[arg])
             text += ' ' + arg
         
         text += ')'
@@ -699,38 +718,44 @@ class RulePN(BasicPetriNet):
         
         text = ''
         
-        for arg in lst[2]:
-            if arg in self._main_transition._func_dict:
-                arg = '=' + self._get_func_text(self._main_transition._func_dict[arg])
-            text += ' ' + arg 
+        func_dict = lst[1]
+        
+        for arg in lst[3]:
+            if arg in func_dict:
+                arg = '=' + self._get_func_text(func_dict, func_dict[arg])
+            text += ' ' + arg
         
         if not text:
             text = ' ""'
         
-        return '(task (id ?pnpdt_task__) (plan ?pnpdt_planName__) (action_type {0}) (params{1}) (step $?pnpdt_steps__) )'.format(lst[1], text)
+        return '(task (id ?pnpdt_task__) (plan ?pnpdt_planName__) (action_type {0}) (params{1}) (step $?pnpdt_steps__) )'.format(lst[2], text)
     
     def _handle_fact(self, lst):
         text = ''
         
-        for arg in lst[2]:
-            if arg in self._main_transition._func_dict:
-                arg = '=' + self._get_func_text(self._main_transition._func_dict[arg])
+        func_dict = lst[1]
+        
+        for arg in lst[3]:
+            if arg in func_dict:
+                arg = '=' + self._get_func_text(func_dict, func_dict[arg])
             text += ' ' + arg 
         
-        return '({0}{1})'.format(lst[1], text)
+        return '({0}{1})'.format(lst[2], text)
     
     def _handle_sfact(self, lst):
         text = ''
         
-        for p in lst[2]:
+        func_dict = lst[1]
+        
+        for p in lst[3]:
             text += ' (' + p[0]
             for arg in p[1]:
-                if arg in self._main_transition._func_dict:
-                    arg = '=' + self._get_func_text(self._main_transition._func_dict[arg])
+                if arg in func_dict:
+                    arg = '=' + self._get_func_text(func_dict, func_dict[arg])
                 text += ' ' + arg
             text += ')'
         
-        return '({0}{1})'.format(lst[1], text)
+        return '({0}{1})'.format(lst[2], text)
     
     def _handle_delete(self, lst):
         el = lst[1]
@@ -742,13 +767,16 @@ class RulePN(BasicPetriNet):
         return var + ' <-' + fact_text
     
     def _handle_cmp(self, lst):
-        el = lst[1]
+        
+        func_dict = lst[1]
+        
+        el = lst[2]
         op1 = el[1]
-        if op1 in self._main_transition._func_dict:
-            op1 = self._get_func_text(self._main_transition._func_dict[op1])
+        if op1 in func_dict:
+            op1 = self._get_func_text(func_dict, func_dict[op1])
         op2 = el[2]
-        if op2 in self._main_transition._func_dict:
-            op2 = self._get_func_text(self._main_transition._func_dict[op2])
+        if op2 in func_dict:
+            op2 = self._get_func_text(func_dict, func_dict[op2])
         
         return '(test ({0} {1} {2}))'.format(el[0], op1, op2)
     
@@ -786,7 +814,7 @@ class RulePN(BasicPetriNet):
         
         for arg in lst[2]:
             if arg in self._main_transition._func_dict:
-                arg = self._get_func_text(self._main_transition._func_dict[arg])
+                arg = self._get_func_text(self._main_transition._func_dict, self._main_transition._func_dict[arg])
             elif arg in ['?', '$?']:
                 raise Exception('Produced facts cannot have wildcards in them, they must be bound variables.')
             text += ' ' + arg 
@@ -800,7 +828,7 @@ class RulePN(BasicPetriNet):
             text += ' (' + p[0]
             for arg in p[1]:
                 if arg in self._main_transition._func_dict:
-                    arg = self._get_func_text(self._main_transition._func_dict[arg])
+                    arg = self._get_func_text(self._main_transition._func_dict, self._main_transition._func_dict[arg])
                 elif arg in ['?', '$?']:
                     raise Exception('Produced facts cannot have wildcards in them, they must be bound variables.')
                 text += ' ' + arg
@@ -813,7 +841,7 @@ class RulePN(BasicPetriNet):
         
         for arg in lst[2]:
             if arg in self._main_transition._func_dict:
-                arg = self._get_func_text(self._main_transition._func_dict[arg])
+                arg = self._get_func_text(self._main_transition._func_dict, self._main_transition._func_dict[arg])
             text += ' ' + arg 
         
         if not text:
@@ -830,10 +858,10 @@ class RulePN(BasicPetriNet):
         symbol = lst[2][1]
         
         if params in self._main_transition._func_dict:
-            params = self._get_func_text(self._main_transition._func_dict[params])
+            params = self._get_func_text(self._main_transition._func_dict, self._main_transition._func_dict[params])
         
         if symbol in self._main_transition._func_dict:
-            symbol = self._get_func_text(self._main_transition._func_dict[symbol])
+            symbol = self._get_func_text(self._main_transition._func_dict, self._main_transition._func_dict[symbol])
         
         return '(send-command "{0}" {1} {2})'.format(lst[1], symbol, params)
     
@@ -843,7 +871,7 @@ class RulePN(BasicPetriNet):
         
         for p in lst[2]:
             if p in self._main_transition._func_dict:
-                p = self._get_func_text(self._main_transition._func_dict[p])
+                p = self._get_func_text(self._main_transition._func_dict, self._main_transition._func_dict[p])
             params.append(p)
         
         return '({0} {1})'.format(lst[1], ' '.join(params))
