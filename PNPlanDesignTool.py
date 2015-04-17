@@ -800,11 +800,16 @@ class PNPDT(object):
             if not tkMessageBox.askokcancel('Close without saving?', 'Are you sure you want to discard any unsaved changes?', default = tkMessageBox.CANCEL):
                 return
         
+        default_path = os.path.expanduser('~/Desktop')
+        ws_path = os.path.expanduser('~/Workspaces/CLIPS/Planning/Tasks/')
+        if os.path.isdir(ws_path):
+            default_path = ws_path
+        
         zip_filename = tkFileDialog.askopenfilename(
                                                   defaultextension = '.pnpdt',
                                                   filetypes=[('Petri Net Plan Design Tool file', '*.pnpdt')],
                                                   title = 'Open PNPDT file...',
-                                                  initialdir = os.path.dirname(self.file_path) if self.file_path is not None else os.path.expanduser('~/Desktop'),
+                                                  initialdir = os.path.dirname(self.file_path) if self.file_path is not None else default_path
                                                   )
         if not zip_filename:
             return
@@ -905,11 +910,17 @@ class PNPDT(object):
         self._update_state_bar('File saved: ' + self.file_path)
     
     def save_as(self):
+        
+        default_path = os.path.expanduser('~/Desktop')
+        ws_path = os.path.expanduser('~/Workspaces/CLIPS/Planning/Tasks/')
+        if os.path.isdir(ws_path):
+            default_path = ws_path
+        
         zip_filename = tkFileDialog.asksaveasfilename(
                                                   defaultextension = '.pnpdt',
                                                   filetypes=[('Petri Net Plan Design Tool file', '*.pnpdt')],
                                                   title = 'Save as PNPDT file...',
-                                                  initialdir = os.path.dirname(self.file_path) if self.file_path is not None else os.path.expanduser('~/Desktop'),
+                                                  initialdir = os.path.dirname(self.file_path) if self.file_path is not None else default_path,
                                                   initialfile = os.path.basename(self.file_path) if self.file_path is not None else ''
                                                   )
         if not zip_filename:
@@ -927,9 +938,15 @@ class PNPDT(object):
         self.root.destroy()
         
     def get_clips_code(self):
+        
+        default_path = os.path.expanduser('~/Desktop')
+        ws_path = os.path.expanduser('~/Workspaces/CLIPS/Planning/Tasks/')
+        if os.path.isdir(ws_path):
+            default_path = ws_path
+        
         dest_dir = tkFileDialog.askdirectory(
                                               title = 'Save CLIPS code to...',
-                                              initialdir = os.path.dirname(self.file_path) if self.file_path is not None else os.path.expanduser('~/Desktop')
+                                              initialdir = os.path.dirname(self.file_path) if self.file_path is not None else default_path
                                             )
         
         if not dest_dir:
