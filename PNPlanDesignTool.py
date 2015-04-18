@@ -17,8 +17,9 @@ import tempfile
 from gui.tabmanager import TabManager
 from gui.pneditors import DexecPNEditor,\
     FinalizationPNEditor, CancelationPNEditor, RulePNEditor
-from gui.auxdialogs import InputDialog, CopyTextDialog
+from gui.auxdialogs import InputDialog, CopyTextDialog, InfoDialog
 from nodes import FactPlace
+from StringIO import StringIO
 
 class PNPDT(object):
     
@@ -98,7 +99,11 @@ class PNPDT(object):
         
         menubar.add_cascade(label = 'File', menu = file_menu)
         
-        menubar.add_command(label="Get CLIPS Code...", command = self.get_clips_code)
+        tools_menu = tk.Menu(menubar, tearoff = False)
+        tools_menu.add_command(label="Get unmet dependencies", command = self.get_unmet_dependencies)
+        tools_menu.add_command(label="Get CLIPS Code...", command = self.get_clips_code)
+        
+        menubar.add_cascade(label = 'Tools', menu = tools_menu)
         
         self.root.config(menu = menubar)
         
@@ -783,7 +788,7 @@ class PNPDT(object):
         return True
     
     #######################################################
-    #                MENU ACTIONS
+    #                FILE MENU ACTIONS
     #######################################################
     
     def _check_edited(self):
@@ -936,7 +941,65 @@ class PNPDT(object):
                 return
         
         self.root.destroy()
+    
+    #######################################################
+    #                TOOLS MENU ACTIONS
+    #######################################################
+    
+    def get_unmet_dependencies(self):
         
+        string_buffer = StringIO()
+        
+        tasks = self.project_tree.get_children('Tasks/')
+        task_names_set = set()
+        unmet_tasks = set()
+        
+        for t in tasks:
+            basename = os.path.basename(t[:-1])
+            par = basename.find('(')
+            if par >= 0:
+                basename = basename[:par]
+            task_names_set.add(basename)
+        
+        for t in tasks:
+            for item in self.project_tree.get_children(t + 'Dexec_Rules/'):
+                pne = self.petri_nets[item]
+                pn = pne._petri_net
+                dependency_tasks = pn.get_dependency_tasks()
+                while dependency_tasks:
+                    dt = dependency_tasks.pop()
+                    if dt not in task_names_set:
+                        unmet_tasks.add(dt)
+                        string_buffer.write("WARNING: Task '" + dt + "' is missing.\n")
+            
+            for item in self.project_tree.get_children(t + 'Finalizing_Rules/'):
+                pne = self.petri_nets[item]
+                pn = pne._petri_net
+                dependency_tasks = pn.get_dependency_tasks()
+                while dependency_tasks:
+                    dt = dependency_tasks.pop()
+                    if dt not in task_names_set:
+                        unmet_tasks.add(dt)
+                        string_buffer.write("WARNING: Task '" + dt + "' is missing.\n")
+            
+            for item in self.project_tree.get_children(t + 'Canceling_Rules/'):
+                pne = self.petri_nets[item]
+                pn = pne._petri_net
+                dependency_tasks = pn.get_dependency_tasks()
+                while dependency_tasks:
+                    dt = dependency_tasks.pop()
+                    if dt not in task_names_set:
+                        unmet_tasks.add(dt)
+                        string_buffer.write("WARNING: Task '" + dt + "' is missing.\n")
+        
+        text = string_buffer.getvalue()
+        string_buffer.close()
+        
+        dialog = CopyTextDialog('UNMET DEPENDENCIES', text)
+        
+        dialog.window.transient(self.root)
+        self.root.wait_window(dialog.window)
+    
     def get_clips_code(self):
         
         default_path = os.path.expanduser('~/Desktop')
