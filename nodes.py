@@ -961,7 +961,7 @@ class RuleTransition(BaseRuleTransition):
     def _get_preconditions(self, is_cancelation = False):
         
         self._func_vars = set()
-        self._bound_vars = set()
+        self._bound_vars = set(['?pnpdt_task__', '?pnpdt_planName__', '?pnpdt_steps__'])
         self._unbound_vars = set()
         
         incoming_arcs = self._incoming_arcs.values()
