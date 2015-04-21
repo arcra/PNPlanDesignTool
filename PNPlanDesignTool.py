@@ -629,9 +629,23 @@ class PNPDT(object):
     def _move_petri_net(self, old_id, old_parent, parent, old_name, name):
         item_id = parent + name
         pne = self.petri_nets.pop(old_id)
+        old_tags = self.project_tree.item(old_id, "tags")
         try:
+            item_tags = list(self.project_tree.item(parent, "tags")) + ['petri_net']
+            item_tags.remove('folder')
+            try:
+                item_tags.remove('dexec_folder')
+            except:
+                try:
+                    item_tags.remove('finalizing_folder')
+                except:
+                    try:
+                        item_tags.remove('canceling_folder')
+                    except:
+                        pass
+            
             index = self._get_sorting_order(item_id, self.project_tree.get_children(parent))
-            self.project_tree.insert(parent, index, item_id, text = name, tags = ['petri_net'])
+            self.project_tree.insert(parent, index, item_id, text = name, tags = item_tags)
             self.project_tree.delete(old_id)
             self._adjust_width(name, item_id)
             pne._petri_net.name = name
@@ -640,7 +654,7 @@ class PNPDT(object):
             tkMessageBox.showerror('ERROR', 'Item could not be inserted in the selected node, possible duplicate name.\n\nERROR: ' + str(e))
             try:
                 index = self._get_sorting_order(old_id, self.project_tree.get_children(old_parent))
-                self.project_tree.insert(old_parent, index, old_id, text = old_name, tags = ['petri_net'])
+                self.project_tree.insert(old_parent, index, old_id, text = old_name, tags = old_tags)
             except:
                 pass
             self.petri_nets[old_id] = pne
@@ -655,7 +669,7 @@ class PNPDT(object):
         original_pne = self.petri_nets[self.clicked_element]
         #This property (pne.petri_net) returns a deepcopy of the object:
         new_pn = original_pne.petri_net
-        new_pn.name += '_copy_'
+        new_pn.name += '-copy_'
         
         PNEditorClass = original_pne.__class__
         
