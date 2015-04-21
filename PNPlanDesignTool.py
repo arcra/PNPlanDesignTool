@@ -497,6 +497,8 @@ class PNPDT(object):
         
         zip_file = zipfile.ZipFile(zip_filename, 'r')
         
+        pn_count = 0
+        
         tmp_dir = tempfile.mkdtemp()
         
         task_name = zip_file.read('task_name.txt').strip()
@@ -530,6 +532,7 @@ class PNPDT(object):
             f.write(zip_file.read(x))
             f.close()
             
+            pn_count += 1
             pn = PNEditorClass.PetriNetClass.from_pnml_file(file_path, task_name)[0]
             pne = PNEditorClass(self.tab_manager, PetriNet = pn)
             self.create_petri_net(pne_object = pne)
@@ -541,6 +544,8 @@ class PNPDT(object):
         
         
         self._update_state_bar('Imported task: ' + task_name)
+        
+        return pn_count
     
     def import_from_PNML(self):
         
@@ -822,6 +827,8 @@ class PNPDT(object):
         self._update_state_bar('Loading...')
         
         tasks = self.project_tree.get_children('Tasks/')
+        tasks_count = 0
+        pn_count = 0
         
         for t in tasks:
             for folder in self.project_tree.get_children(t):
@@ -845,7 +852,8 @@ class PNPDT(object):
                 f = open(file_name, 'w')
                 f.write(zip_file.read(x))
                 f.close()
-                self._import_task(file_name)
+                tasks_count += 1
+                pn_count += self._import_task(file_name)
                 os.remove(file_name)
             elif x.filename[-7:] == '.g.pnml':
                 self.clicked_element = 'Generic_Rules/'
@@ -854,6 +862,7 @@ class PNPDT(object):
                 f = open(file_name, 'w')
                 f.write(zip_file.read(x))
                 f.close()
+                pn_count += 1
                 self._import_from_pnml(file_name, RulePNEditor, None)
                 os.remove(file_name)
             else:
@@ -864,6 +873,7 @@ class PNPDT(object):
         zip_file.close()
         
         self._update_state_bar('Opened: ' + self.file_path)
+        print 'Loaded ' + str(tasks_count) + ' tasks, ' + str(pn_count) + ' petri nets.'
     
     def save(self, event = None):
         if not self.file_path:
