@@ -513,8 +513,7 @@ class FunctionPlace(BaseFactPlace):
     FILL_COLOR = '#66AA00'
     OUTLINE_COLOR = '#447700'
     PREFIX = 'fnc'
-    #REGEX = re.compile(r'fnc\s*\(\s*(?P<func>[^\s,]+)(?P<args>(\s*,\s*(([-]?[0-9]+(\.[0-9]+)?)|(\??[a-zA-Z][a-zA-Z0-9_-]*)|("[^"]*")))+)\s*,\s*(?P<result>(\?[a-zA-Z][a-zA-Z0-9_-]*))\s*\)')
-    REGEX = re.compile(r'fnc\s*\(\s*(?P<func>[^\s,]+)(?P<args>(\s*,\s*(([-]?[0-9]+(\.[0-9]+)?)|(\??[a-zA-Z][a-zA-Z0-9_-]*)|("([^\\"]|\\.)*")))+)\s*,\s*(?P<result>(\?[a-zA-Z][a-zA-Z0-9_-]*))\s*\)')
+    REGEX = re.compile(r'fnc\s*\(\s*(?P<func>[^\s,]+)(?P<args>(\s*,\s*(([-]?[0-9]+(\.[0-9]+)?)|((\$?\?)?[a-zA-Z][a-zA-Z0-9_-]*)|("([^\\"]|\\.)*")))+)\s*,\s*(?P<result>(\?[a-zA-Z][a-zA-Z0-9_-]*))\s*\)')
     
     @classmethod
     def _get_new_node_name(cls):
@@ -554,8 +553,7 @@ class FunctionCallPlace(BaseFactPlace):
     FILL_COLOR = '#EEEE00'
     OUTLINE_COLOR = '#AAAA00'
     PREFIX = 'fncCall'
-    #REGEX = re.compile(r'fncCall\s*\(\s*(?P<func>[^\s,\?]+)(?P<args>(\s*,\s*(([-]?[0-9]+(\.[0-9]+)?)|(\??[a-zA-Z][a-zA-Z0-9_-]*)|("[^"]*")))+)\s*\)')
-    REGEX = re.compile(r'(?P<func>[a-zA-Z][a-zA-Z0-9_-]+)\s*(\(\s*(?P<args>(([-]?[0-9]+(\.[0-9]+)?)|(\??[a-zA-Z][a-zA-Z0-9_-]*)|("([^\\"]|\\.)*"))(\s*,\s*(([-]?[0-9]+(\.[0-9]+)?)|(\??[a-zA-Z][a-zA-Z0-9_-]*)|("([^\\"]|\\.)*")))*)\s*\))?')
+    REGEX = re.compile(r'(?P<func>[a-zA-Z][a-zA-Z0-9_-]+)\s*(\(\s*(?P<args>(([-]?[0-9]+(\.[0-9]+)?)|((\$?\?)?[a-zA-Z][a-zA-Z0-9_-]*)|("([^\\"]|\\.)*"))(\s*,\s*(([-]?[0-9]+(\.[0-9]+)?)|((\$?\?)?[a-zA-Z][a-zA-Z0-9_-]*)|("([^\\"]|\\.)*")))*)\s*\))?')
     
     @classmethod
     def _get_new_node_name(cls):
