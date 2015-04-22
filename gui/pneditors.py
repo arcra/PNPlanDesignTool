@@ -18,7 +18,7 @@ from nodes import Place, Transition, TRANSITION_CLASSES, PLACE_CLASSES,\
     ComparisonPlace, FunctionCallPlace
 from settings import *
 from utils import Vec2
-from auxdialogs import PositiveIntDialog, NonNegativeFloatDialog, NonNegativeIntDialog
+from auxdialogs import PositiveIntDialog, NonNegativeFloatDialog, NonNegativeIntDialog, IntDialog
 
 class BasicPNEditor(Tkinter.Canvas):
     """
@@ -1336,7 +1336,8 @@ class BasicPNEditor(Tkinter.Canvas):
         transition_id = self._get_transition_id()
         t = self._petri_net.transitions[transition_id]
         
-        dialog = NonNegativeIntDialog("Set transition's priority", 'Write a non-negative integer for \nthe priority of transition: ' + str(t), 'Priority', init_value = t.priority)
+        #dialog = NonNegativeIntDialog("Set transition's priority", 'Write a non-negative integer for \nthe priority of transition: ' + str(t), 'Priority', init_value = t.priority)
+        dialog = IntDialog("Set transition's priority", 'Write an integer for \nthe priority of transition: ' + str(t), 'Priority', init_value = t.priority)
         dialog.window.transient(self)
         self.wait_window(dialog.window)
         if dialog.value_set and t.priority != int(dialog.input_var.get()):
