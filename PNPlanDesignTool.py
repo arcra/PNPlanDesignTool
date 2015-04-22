@@ -1043,6 +1043,7 @@ class PNPDT(object):
         
         task_names = {}
         task_names_set = set()
+        missing_tasks = set()
         
         for t in tasks:
             basename = os.path.basename(t[:-1])
@@ -1116,8 +1117,9 @@ class PNPDT(object):
                         dt = dependency_tasks.pop()
                         if dt in task_names_set:
                             lst_file.write('../' + dt + '/' + dt + '.lst\n')
-                        else:
+                        elif dt not in missing_tasks:
                             print "WARNING: Task '" + dt + "' is missing."
+                            missing_tasks.add(dt)
                 
                 for item in self.project_tree.get_children(t + 'Finalizing_Rules/'):
                     pne = self.petri_nets[item]
@@ -1127,8 +1129,9 @@ class PNPDT(object):
                         dt = dependency_tasks.pop()
                         if dt in task_names_set:
                             lst_file.write('../' + dt + '/' + dt + '.lst\n')
-                        else:
+                        elif dt not in missing_tasks:
                             print "WARNING: Task '" + dt + "' is missing."
+                            missing_tasks.add(dt)
                 
                 for item in self.project_tree.get_children(t + 'Canceling_Rules/'):
                     pne = self.petri_nets[item]
@@ -1138,8 +1141,9 @@ class PNPDT(object):
                         dt = dependency_tasks.pop()
                         if dt in task_names_set:
                             lst_file.write('../' + dt + '/' + dt + '.lst\n')
-                        else:
+                        elif dt not in missing_tasks:
                             print "WARNING: Task '" + dt + "' is missing."
+                            missing_tasks.add(dt)
                 
                 lst_file.close()
                 
