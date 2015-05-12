@@ -17,7 +17,7 @@ import tempfile
 from gui.tabmanager import TabManager
 from gui.pneditors import DexecPNEditor,\
     FinalizationPNEditor, CancelationPNEditor, RulePNEditor
-from gui.auxdialogs import InputDialog, CopyTextDialog, InfoDialog
+from gui.auxdialogs import InputDialog, CopyTextDialog
 from nodes import FactPlace
 from StringIO import StringIO
 
@@ -400,6 +400,10 @@ class PNPDT(object):
         item_tags = list(self.project_tree.item(self.clicked_element, "tags")) + ['petri_net']
         item_tags.remove('folder')
         try:
+            item_tags.remove('top_level')
+        except:
+            pass
+        try:
             item_tags.remove('dexec_folder')
         except:
             try:
@@ -408,7 +412,10 @@ class PNPDT(object):
                 try:
                     item_tags.remove('canceling_folder')
                 except:
-                    pass
+                    try:
+                        item_tags.remove('rules_folder')
+                    except:
+                        pass
         
         try:
             if pne_object:
@@ -588,7 +595,7 @@ class PNPDT(object):
         
         self._import_from_pnml(filename, PNEditorClass, task)
         
-    def _import_from_pnml(self, filename, PNEditorClass, task):
+    def _import_from_pnml(self, filename, PNEditorClass, task, open_tab = True):
         
         try:
             petri_nets = PNEditorClass.PetriNetClass.from_pnml_file(filename, task)
@@ -597,7 +604,7 @@ class PNPDT(object):
             return
         
         if len(petri_nets) > 1:
-            print 'warning: More than 1 petri net read, only 1 loaded.'
+            print 'WARNING: More than 1 petri net read, only 1 loaded.'
         
         try:
             pn = petri_nets[0]
@@ -607,8 +614,9 @@ class PNPDT(object):
         pne = PNEditorClass(self.tab_manager, PetriNet = pn)
         self.create_petri_net(pne)
         pne.edited = False
-        self.tab_manager.add(pne, text = pne.name)
-        self.tab_manager.select(pne)
+        if open_tab:
+            self.tab_manager.add(pne, text = pne.name)
+            self.tab_manager.select(pne)
     
     def rename_petri_net(self):
         old_name = self.project_tree.item(self.clicked_element, 'text')
@@ -877,7 +885,7 @@ class PNPDT(object):
                 f.write(zip_file.read(x))
                 f.close()
                 pn_count += 1
-                self._import_from_pnml(file_name, RulePNEditor, None)
+                self._import_from_pnml(file_name, RulePNEditor, None, open_tab = False)
                 os.remove(file_name)
             else:
                 print 'WARNING: Unknown file was not loaded - ' + x.filename
@@ -919,17 +927,12 @@ class PNPDT(object):
         for r in self.project_tree.get_children('Generic_Rules/'):
             self.clicked_element = r
             
-            rule_name = os.path.basename(self.clicked_element[:-1])
-            pos = rule_name.find('(')
-            if pos > -1:
-                rule_name = rule_name[:pos]
+            rule_name = os.path.basename(self.clicked_element)
             rule_name = rule_name + '.g.pnml'
             
             file_path = os.path.join(tmp_dir, rule_name)
             
-            result = self._export_to_PNML(self.clicked_element, file_path)
-            
-            if result:
+            if self._export_to_PNML(self.clicked_element, file_path):
                 zip_file.write(file_path, rule_name)
             os.remove(file_path)
         
