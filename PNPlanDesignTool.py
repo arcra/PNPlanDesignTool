@@ -992,9 +992,11 @@ class PNPDT(object):
                 dependency_tasks = pn.get_dependency_tasks()
                 while dependency_tasks:
                     dt = dependency_tasks.pop()
-                    if dt not in task_names_set:
+                    if dt not in task_names_set and dt not in unmet_tasks:
                         unmet_tasks.add(dt)
                         string_buffer.write("WARNING: Task '" + dt + "' is missing.\n")
+                
+                
             
             for item in self.project_tree.get_children(t + 'Finalizing_Rules/'):
                 pne = self.petri_nets[item]
@@ -1002,7 +1004,7 @@ class PNPDT(object):
                 dependency_tasks = pn.get_dependency_tasks()
                 while dependency_tasks:
                     dt = dependency_tasks.pop()
-                    if dt not in task_names_set:
+                    if dt not in task_names_set and dt not in unmet_tasks:
                         unmet_tasks.add(dt)
                         string_buffer.write("WARNING: Task '" + dt + "' is missing.\n")
             
@@ -1012,7 +1014,7 @@ class PNPDT(object):
                 dependency_tasks = pn.get_dependency_tasks()
                 while dependency_tasks:
                     dt = dependency_tasks.pop()
-                    if dt not in task_names_set:
+                    if dt not in task_names_set and dt not in unmet_tasks:
                         unmet_tasks.add(dt)
                         string_buffer.write("WARNING: Task '" + dt + "' is missing.\n")
         
