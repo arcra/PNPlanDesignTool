@@ -857,13 +857,25 @@ class RulePN(BasicPetriNet):
         params = lst[2][0]
         symbol = lst[2][1]
         
+        timeout = ""
+        try:
+            timeout = lst[2][2]
+        except:
+            pass
+        
+        attempts = ""
+        try:
+            attempts = lst[2][3]
+        except:
+            pass
+        
         if params in self._main_transition._func_dict:
             params = self._get_func_text(self._main_transition._func_dict, self._main_transition._func_dict[params])
         
         if symbol in self._main_transition._func_dict:
             symbol = self._get_func_text(self._main_transition._func_dict, self._main_transition._func_dict[symbol])
         
-        return '(send-command "{0}" {1} {2})'.format(lst[1], symbol, params)
+        return '(send-command "{0}" {1} {2} {3} {4})'.format(lst[1], symbol, params, timeout, attempts)
     
     def _handle_fncCall(self, lst):
         
