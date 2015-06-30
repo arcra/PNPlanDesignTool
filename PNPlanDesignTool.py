@@ -1064,6 +1064,8 @@ class PNPDT(object):
             path = os.path.join(dest_dir, folder)
             filename_prefix = os.path.join(path, folder)
             
+            added_dependencies = set()
+            
             try:
                 os.mkdir(path)
             except Exception as e:
@@ -1117,7 +1119,8 @@ class PNPDT(object):
                 for item in self.project_tree.get_children(t + 'Dexec_Rules/'):
                     pne = self.petri_nets[item]
                     pn = pne._petri_net
-                    dependency_tasks = pn.get_dependency_tasks()
+                    dependency_tasks = pn.get_dependency_tasks() - added_dependencies
+                    added_dependencies |= dependency_tasks
                     while dependency_tasks:
                         dt = dependency_tasks.pop()
                         if dt in task_names_set:
@@ -1129,7 +1132,8 @@ class PNPDT(object):
                 for item in self.project_tree.get_children(t + 'Finalizing_Rules/'):
                     pne = self.petri_nets[item]
                     pn = pne._petri_net
-                    dependency_tasks = pn.get_dependency_tasks()
+                    dependency_tasks = pn.get_dependency_tasks() - added_dependencies
+                    added_dependencies |= dependency_tasks
                     while dependency_tasks:
                         dt = dependency_tasks.pop()
                         if dt in task_names_set:
@@ -1141,7 +1145,8 @@ class PNPDT(object):
                 for item in self.project_tree.get_children(t + 'Canceling_Rules/'):
                     pne = self.petri_nets[item]
                     pn = pne._petri_net
-                    dependency_tasks = pn.get_dependency_tasks()
+                    dependency_tasks = pn.get_dependency_tasks() - added_dependencies
+                    added_dependencies |= dependency_tasks
                     while dependency_tasks:
                         dt = dependency_tasks.pop()
                         if dt in task_names_set:
